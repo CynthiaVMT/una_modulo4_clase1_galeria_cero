@@ -1,0 +1,976 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>GALERÍA CERO — Arte Contemporáneo, Fotografía & Nuevos Medios</title>
+  <meta name="description" content="Galería de arte contemporáneo minimalista en blanco y negro. Salas de fotografía, esculturas 360° e instalaciones interactivas de luz y sonido.">
+
+  <!-- Google Fonts: Montserrat (Gotham Ultra style) & Inter -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600&family=Montserrat:wght@800;900&family=Syne:wght@700;800&display=swap" rel="stylesheet">
+
+  <link rel="stylesheet" href="style.css">
+</head>
+<body class="theme-noir">
+
+  <!-- BARRA DE NAVEGACIÓN ESTILO GLASS -->
+  <header class="glass-navbar" id="mainNavbar">
+    <div class="nav-container">
+      <a href="#home" class="brand-logo" data-nav="home">
+        <span class="logo-mark">0</span>
+        <span class="logo-text">GALERÍA CERO</span>
+      </a>
+
+      <nav class="nav-menu" id="navMenu">
+        <a href="#home" class="nav-link active" data-nav="home">Inicio</a>
+        <a href="#pics" class="nav-link" data-nav="pics">Pics</a>
+        <a href="#section360" class="nav-link" data-nav="section360">360°</a>
+        <a href="#ls" class="nav-link" data-nav="ls">L&amp;S</a>
+        <a href="#museo" class="nav-link" data-nav="museo">El Museo</a>
+        <a href="#contacto" class="nav-link" data-nav="contacto">Contacto</a>
+      </nav>
+
+      <div class="nav-actions">
+        <!-- Control de Audio Espacial Ambiental Web Audio API -->
+        <button id="soundToggleBtn" class="sound-toggle-btn" title="Activar/Silenciar paisaje sonoro ambiental" aria-label="Control de sonido ambiental">
+          <span class="sound-waves">
+            <span class="bar bar-1"></span>
+            <span class="bar bar-2"></span>
+            <span class="bar bar-3"></span>
+          </span>
+          <span class="sound-label">AUDIO OFF</span>
+        </button>
+
+        <button class="mobile-toggle" id="mobileMenuBtn" aria-label="Abrir Menú">
+          <span class="hamburger-line"></span>
+          <span class="hamburger-line"></span>
+        </button>
+      </div>
+    </div>
+  </header>
+
+  <main id="mainContent">
+
+    <!-- ==============================================
+         HOME: GRAN HEADER (VIDEO/ANIMACIÓN)
+         ============================================== -->
+    <section class="hero-section" id="home">
+      <!-- Fondo animado monocromático con overlay de textura cinematográfica -->
+      <div class="hero-media-wrapper">
+        <video class="hero-media" autoplay muted loop playsinline poster="assets/images/hero/hero-poster.jpg">
+          <source src="assets/videos/hero.mp4" type="video/mp4">
+          <source src="https://assets.mixkit.co/videos/preview/mixkit-black-and-white-abstract-ink-smoke-art-41009-large.mp4" type="video/mp4">
+        </video>
+        <div class="hero-fallback-overlay"></div>
+        <div class="hero-grain-overlay"></div>
+      </div>
+
+      <div class="hero-content">
+        <div class="hero-badge">TEMPORADA MONOCROMÁTICA 2026 // EDICIÓN I</div>
+        <h1 class="hero-title gotham-ultra">
+          ESPACIO<br>
+          <span class="title-outline">INFINITO</span><br>
+          EN BLANCO &amp; NEGRO
+        </h1>
+        <p class="hero-description">
+          Un santuario de arte contemporáneo concebido a partir de contrastes radicales, geometrías escultóricas y dimensiones sonoras inmersivas.
+        </p>
+        <div class="hero-actions">
+          <a href="#home-access-pics" class="btn-primary glass-btn">EXPLORAR COLECCIONES ↓</a>
+          <a href="#museo" class="btn-secondary" data-nav="museo">CONOCER EL MUSEO</a>
+        </div>
+      </div>
+
+      <div class="hero-scroll-indicator">
+        <span class="scroll-mouse">
+          <span class="scroll-wheel"></span>
+        </span>
+        <span class="scroll-text">DESLIZA PARA NAVEGAR</span>
+      </div>
+    </section>
+
+    <!-- ==============================================
+         TRES ACCESOS DIRECTOS DE GRAN TAMAÑO (HOME)
+         LAYOUT PANTALLA DIVIDIDA EN DOS (SPLIT-SCREEN)
+         ============================================== -->
+
+    <!-- ACCESO DIRECTO 1: OBRAS FOTOGRÁFICAS (CARRUSEL SLIDER ANIMADO) -->
+    <section class="split-section" id="home-access-pics">
+      <div class="split-container">
+        <!-- Lado Izquierdo: Título de Sección y Manifiesto Curatorial -->
+        <div class="split-col split-text-col">
+          <span class="split-index">ACCESO 01 / SALA A</span>
+          <h2 class="split-title gotham-ultra">
+            OBRAS<br>FOTOGRÁFICAS
+          </h2>
+          <div class="split-divider"></div>
+          <p class="split-paragraph">
+            Luz colapsada en plata y gelatina. Esta selección aborda el claroscuro arquitectónico, las geometrías metropolitanas y el silencio visual a través de lentes de medio formato.
+          </p>
+          <div class="split-meta-box glass-card">
+            <div class="meta-item">
+              <span class="meta-number">24</span>
+              <span class="meta-label">Obras exhibidas</span>
+            </div>
+            <div class="meta-item">
+              <span class="meta-number">06</span>
+              <span class="meta-label">Fotógrafos contemporáneos</span>
+            </div>
+          </div>
+          <div class="split-cta-wrap">
+            <a href="#pics" class="btn-primary glass-btn" data-nav="pics">
+              INGRESAR A SALA PICS ↗
+            </a>
+          </div>
+        </div>
+
+        <!-- Lado Derecho: Div de Acceso Directo de Gran Tamaño (Carrusel Slider) -->
+        <div class="split-col split-interactive-col">
+          <div class="direct-access-card glass-card direct-slider-module" id="homeDirectCarousel">
+            <div class="module-header-tag">
+              <span class="live-dot"></span> VISTA PREVIA DINÁMICA
+            </div>
+
+            <!-- Slides del Mini-Carrusel en Home -->
+            <div class="slider-viewport">
+              <div class="slider-track" id="homeSliderTrack">
+                <!-- Slide 1 -->
+                <div class="home-slide active" data-index="0">
+                  <img src="assets/images/pics/obra1.jpg" onerror="this.onerror=null; this.src='https://images.unsplash.com/photo-1513694203232-719a280e022f?auto=format&fit=crop&w=1200&q=80'" alt="Arquitectura Brutalista Noir" loading="lazy">
+                  <div class="slide-caption glass-caption">
+                    <span class="caption-artist">Elena Vance</span>
+                    <h4 class="caption-title">Monolito en Sombra IV (2024)</h4>
+                  </div>
+                </div>
+                <!-- Slide 2 -->
+                <div class="home-slide" data-index="1">
+                  <img src="assets/images/pics/obra2.jpg" onerror="this.onerror=null; this.src='https://images.unsplash.com/photo-1509198397868-475647b2a1e5?auto=format&fit=crop&w=1200&q=80'" alt="Geometrías y Sombras" loading="lazy">
+                  <div class="slide-caption glass-caption">
+                    <span class="caption-artist">Marcus Kroll</span>
+                    <h4 class="caption-title">Proyección Cenital (2025)</h4>
+                  </div>
+                </div>
+                <!-- Slide 3 -->
+                <div class="home-slide" data-index="2">
+                  <img src="assets/images/pics/obra3.jpg" onerror="this.onerror=null; this.src='https://images.unsplash.com/photo-1506157786151-b8491531f063?auto=format&fit=crop&w=1200&q=80'" alt="Espiral de Hormigón" loading="lazy">
+                  <div class="slide-caption glass-caption">
+                    <span class="caption-artist">Sora Takahashi</span>
+                    <h4 class="caption-title">Vértigo Helicoidal (2024)</h4>
+                  </div>
+                </div>
+                <!-- Slide 4 -->
+                <div class="home-slide" data-index="3">
+                  <img src="assets/images/pics/obra4.jpg" onerror="this.onerror=null; this.src='https://images.unsplash.com/photo-1534447677768-be436bb09401?auto=format&fit=crop&w=1200&q=80'" alt="Retrato de Alto Contraste" loading="lazy">
+                  <div class="slide-caption glass-caption">
+                    <span class="caption-artist">Luka Bergman</span>
+                    <h4 class="caption-title">El Silencio de la Mirada (2023)</h4>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <!-- Controles del Slider Directo -->
+            <div class="slider-controls-bar">
+              <div class="slider-counter">
+                <span id="homeSlideCurrent">01</span> / <span id="homeSlideTotal">04</span>
+              </div>
+              <div class="slider-nav-btns">
+                <button class="slider-arrow-btn" id="homeSliderPrev" aria-label="Fotografía anterior">←</button>
+                <button class="slider-arrow-btn" id="homeSliderNext" aria-label="Fotografía siguiente">→</button>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ACCESO DIRECTO 2: OBRAS ESCULTÓRICAS (VIDEO / ANIMACIÓN 360) -->
+    <section class="split-section bg-darker" id="home-access-sculptures">
+      <div class="split-container split-reverse-mobile">
+        <!-- Lado Izquierdo: Título de Sección -->
+        <div class="split-col split-text-col">
+          <span class="split-index">ACCESO 02 / SALA B</span>
+          <h2 class="split-title gotham-ultra">
+            OBRAS<br>ESCULTÓRICAS
+          </h2>
+          <div class="split-divider"></div>
+          <p class="split-paragraph">
+            Masas de obsidiana, mármol pulido y grafito que desafían la gravedad. El volumen tridimensional es observado como una coreografía continua donde la luz esculpe cada arista en tiempo real.
+          </p>
+          <div class="split-meta-box glass-card">
+            <div class="meta-item">
+              <span class="meta-number">360°</span>
+              <span class="meta-label">Rotación orbital</span>
+            </div>
+            <div class="meta-item">
+              <span class="meta-number">12</span>
+              <span class="meta-label">Piezas monumentales</span>
+            </div>
+          </div>
+          <div class="split-cta-wrap">
+            <a href="#section360" class="btn-primary glass-btn" data-nav="section360">
+              EXPLORAR SALA 360° ↗
+            </a>
+          </div>
+        </div>
+
+        <!-- Lado Derecho: Div de Acceso Directo de Gran Tamaño (Video/Loop Escultórico) -->
+        <div class="split-col split-interactive-col">
+          <div class="direct-access-card glass-card direct-sculpture-module">
+            <div class="module-header-tag">
+              <span class="live-dot pulse"></span> LOOP ESCULTÓRICO PERPETUO
+            </div>
+
+            <div class="sculpture-preview-stage">
+              <!-- Video / Canvas con escultura monocromática giratoria -->
+              <div class="sculpture-video-container">
+                <canvas id="homeSculptureCanvas" class="home-sculpture-canvas" width="600" height="600"></canvas>
+                <div class="sculpture-pedestal-shadow"></div>
+              </div>
+
+              <div class="sculpture-overlay-info glass-caption">
+                <div class="sculpture-badge">OBRA CENTRAL</div>
+                <h4>Monolito Vectorial Cero</h4>
+                <p>Grafito sinterizado &amp; Polímero opaco // 180cm</p>
+              </div>
+
+              <!-- Indicador de Rotación Orbital -->
+              <div class="orbital-indicator">
+                <svg viewBox="0 0 100 100" class="orbital-svg">
+                  <circle cx="50" cy="50" r="45" class="orbital-path"></circle>
+                  <circle cx="50" cy="5" r="4" class="orbital-satellite"></circle>
+                </svg>
+                <span class="orbital-label">360° ROT</span>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ACCESO DIRECTO 3: OBRAS INTERACTIVAS DIGITALES, VISUALES Y DE SONIDO (CON DESTELLO SUTIL) -->
+    <section class="split-section" id="home-access-interactive">
+      <div class="split-container">
+        <!-- Lado Izquierdo: Título de Sección -->
+        <div class="split-col split-text-col">
+          <span class="split-index">ACCESO 03 / SALA C</span>
+          <h2 class="split-title gotham-ultra">
+            LUZ, SONIDO &amp;<br>DIGITAL
+          </h2>
+          <div class="split-divider"></div>
+          <p class="split-paragraph">
+            Instalaciones inmateriales donde el espectador completa la obra. Campos electromagnéticos, haces lumínicos en penumbra y resonancias sónicas sintetizadas a partir de la interacción corporal.
+          </p>
+          <div class="split-meta-box glass-card">
+            <div class="meta-item">
+              <span class="meta-number">Hz</span>
+              <span class="meta-label">Síntesis reactiva</span>
+            </div>
+            <div class="meta-item">
+              <span class="meta-number">3D</span>
+              <span class="meta-label">Inmersión espacial</span>
+            </div>
+          </div>
+          <div class="split-cta-wrap">
+            <a href="#ls" class="btn-primary glass-btn" data-nav="ls">
+              EXPERIMENTAR LUZ &amp; SONIDO ↗
+            </a>
+          </div>
+        </div>
+
+        <!-- Lado Derecho: Div Fijo con DESTELLO SUTIL al pasar el mouse -->
+        <div class="split-col split-interactive-col">
+          <div class="interactive-glow-card-wrapper" id="glowCardWrapper">
+            <!-- Destello de halo sutil que reacciona con la posición del mouse -->
+            <div class="dynamic-subtle-flare" id="subtleFlare"></div>
+
+            <div class="direct-access-card glass-card interactive-art-card" id="interactiveGlowCard">
+              <div class="module-header-tag">
+                <span class="interactive-sparkle">✦</span> INTERACTÚA CON EL MOUSE
+              </div>
+
+              <div class="interactive-art-media-box">
+                <img src="assets/images/interactive/interactiva.jpg" onerror="this.onerror=null; this.src='https://images.unsplash.com/photo-1518709268805-4e9042af9f23?auto=format&fit=crop&w=1200&q=80'" alt="Instalación lumínica y sonora" class="interactive-main-img" id="interactiveArtworkImg">
+                
+                <!-- Efecto de partículas / retícula lumínica reactiva -->
+                <canvas id="interactiveCanvasOverlay" class="interactive-canvas-overlay"></canvas>
+
+                <div class="shimmer-glint"></div>
+              </div>
+
+              <div class="interactive-meta-footer glass-caption">
+                <div class="interactive-left">
+                  <span class="pulse-ring"></span>
+                  <div>
+                    <h4 class="caption-title">Frecuencia Resonante 04</h4>
+                    <span class="caption-artist">Arte Sonoro &amp; Algorítmico</span>
+                  </div>
+                </div>
+                <div class="interactive-right">
+                  <button class="play-tone-btn" id="previewToneBtn" title="Escuchar resonancia">
+                    <span class="tone-icon">♪</span> PROBAR SONIDO
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ==============================================
+         PÁGINA INTERNA 1: SECCIÓN PICS (CARRUSEL DINÁMICO)
+         ============================================== -->
+    <section class="page-section section-pics" id="pics">
+      <div class="section-container">
+        
+        <div class="section-heading-split">
+          <div class="heading-left">
+            <span class="section-category-tag">EXPOSICIÓN PRINCIPAL // SALA A</span>
+            <h2 class="section-big-title gotham-ultra">
+              SECCIÓN<br>PICS
+            </h2>
+          </div>
+          <div class="heading-right">
+            <p class="section-lead-text">
+              Un recorrido fotográfico de ultra alta resolución. Navega por las series curadas de arquitectura monolítica, retratos expresionistas y geometría abstracta.
+            </p>
+            <!-- Filtros de Colección -->
+            <div class="gallery-filter-tabs glass-bar" id="picsFilterTabs">
+              <button class="filter-tab active" data-filter="all">TODAS (12)</button>
+              <button class="filter-tab" data-filter="arquitectura">ARQUITECTURA</button>
+              <button class="filter-tab" data-filter="retrato">RETRATO NOIR</button>
+              <button class="filter-tab" data-filter="geometria">GEOMETRÍAS</button>
+            </div>
+          </div>
+        </div>
+
+        <!-- CARRUSEL DINÁMICO DE FOTOGRAFÍAS -->
+        <div class="dynamic-gallery-carousel" id="dynamicPicsCarousel">
+          <div class="carousel-stage">
+            <div class="carousel-track-container">
+              <div class="carousel-main-track" id="picsTrack">
+                <!-- Foto 1 -->
+                <div class="carousel-item" data-category="arquitectura" data-index="0" data-artist="Elena Vance" data-title="La Escala Imposible" data-year="2024" data-camera="Hasselblad H6D-100c · 35mm">
+                  <div class="carousel-card glass-card">
+                    <img src="assets/images/pics/obra1.jpg" onerror="this.onerror=null; this.src='https://images.unsplash.com/photo-1513694203232-719a280e022f?auto=format&fit=crop&w=1600&q=85'" alt="La Escala Imposible" loading="lazy">
+                    <div class="carousel-overlay">
+                      <div class="overlay-top">
+                        <span class="badge-cat">ARQUITECTURA</span>
+                        <button class="btn-inspect" title="Ampliar obra">🔍 INSPECCIONAR</button>
+                      </div>
+                      <div class="overlay-bottom">
+                        <h3>La Escala Imposible</h3>
+                        <p>Elena Vance — Plata sobre gelatina, 2024</p>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                <!-- Foto 2 -->
+                <div class="carousel-item" data-category="geometria" data-index="1" data-artist="Marcus Kroll" data-title="Abstracción en Sombras" data-year="2025" data-camera="Leica M11 Monochrom · 50mm Summilux">
+                  <div class="carousel-card glass-card">
+                    <img src="assets/images/pics/obra2.jpg" onerror="this.onerror=null; this.src='https://images.unsplash.com/photo-1509198397868-475647b2a1e5?auto=format&fit=crop&w=1600&q=85'" alt="Abstracción en Sombras" loading="lazy">
+                    <div class="carousel-overlay">
+                      <div class="overlay-top">
+                        <span class="badge-cat">GEOMETRÍA</span>
+                        <button class="btn-inspect" title="Ampliar obra">🔍 INSPECCIONAR</button>
+                      </div>
+                      <div class="overlay-bottom">
+                        <h3>Abstracción en Sombras</h3>
+                        <p>Marcus Kroll — Impresión Piezography, 2025</p>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                <!-- Foto 3 -->
+                <div class="carousel-item" data-category="arquitectura" data-index="2" data-artist="Sora Takahashi" data-title="El Espiral del Silencio" data-year="2024" data-camera="Fujifilm GFX 100 II · 23mm">
+                  <div class="carousel-card glass-card">
+                    <img src="assets/images/pics/obra3.jpg" onerror="this.onerror=null; this.src='https://images.unsplash.com/photo-1506157786151-b8491531f063?auto=format&fit=crop&w=1600&q=85'" alt="El Espiral del Silencio" loading="lazy">
+                    <div class="carousel-overlay">
+                      <div class="overlay-top">
+                        <span class="badge-cat">ARQUITECTURA</span>
+                        <button class="btn-inspect" title="Ampliar obra">🔍 INSPECCIONAR</button>
+                      </div>
+                      <div class="overlay-bottom">
+                        <h3>El Espiral del Silencio</h3>
+                        <p>Sora Takahashi — Copia en baritado, 2024</p>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                <!-- Foto 4 -->
+                <div class="carousel-item" data-category="retrato" data-index="3" data-artist="Luka Bergman" data-title="Anatomía de la Penumbra" data-year="2023" data-camera="Mamiya RZ67 Pro II · Kodak Tri-X 400">
+                  <div class="carousel-card glass-card">
+                    <img src="assets/images/pics/obra4.jpg" onerror="this.onerror=null; this.src='https://images.unsplash.com/photo-1534447677768-be436bb09401?auto=format&fit=crop&w=1600&q=85'" alt="Anatomía de la Penumbra" loading="lazy">
+                    <div class="carousel-overlay">
+                      <div class="overlay-top">
+                        <span class="badge-cat">RETRATO NOIR</span>
+                        <button class="btn-inspect" title="Ampliar obra">🔍 INSPECCIONAR</button>
+                      </div>
+                      <div class="overlay-bottom">
+                        <h3>Anatomía de la Penumbra</h3>
+                        <p>Luka Bergman — Grabado a la sal, 2023</p>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                <!-- Foto 5 -->
+                <div class="carousel-item" data-category="geometria" data-index="4" data-artist="Aria Sterling" data-title="Planos en Colisión" data-year="2025" data-camera="Phase One IQ4 · 80mm">
+                  <div class="carousel-card glass-card">
+                    <img src="assets/images/pics/obra5.jpg" onerror="this.onerror=null; this.src='https://images.unsplash.com/photo-1600585154340-be6161a56a0c?auto=format&fit=crop&w=1600&q=85'" alt="Planos en Colisión" loading="lazy">
+                    <div class="carousel-overlay">
+                      <div class="overlay-top">
+                        <span class="badge-cat">GEOMETRÍA</span>
+                        <button class="btn-inspect" title="Ampliar obra">🔍 INSPECCIONAR</button>
+                      </div>
+                      <div class="overlay-bottom">
+                        <h3>Planos en Colisión</h3>
+                        <p>Aria Sterling — Negativo digital en platino, 2025</p>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                <!-- Foto 6 -->
+                <div class="carousel-item" data-category="retrato" data-index="5" data-artist="Mateo Rivas" data-title="Perfil en Eclipse" data-year="2024" data-camera="Canon EOS R5C · RF 85mm f/1.2">
+                  <div class="carousel-card glass-card">
+                    <img src="assets/images/pics/obra6.jpg" onerror="this.onerror=null; this.src='https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?auto=format&fit=crop&w=1600&q=85'" alt="Perfil en Eclipse" loading="lazy">
+                    <div class="carousel-overlay">
+                      <div class="overlay-top">
+                        <span class="badge-cat">RETRATO NOIR</span>
+                        <button class="btn-inspect" title="Ampliar obra">🔍 INSPECCIONAR</button>
+                      </div>
+                      <div class="overlay-bottom">
+                        <h3>Perfil en Eclipse</h3>
+                        <p>Mateo Rivas — Cianotipia tonalizada, 2024</p>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <!-- Navegación del Carrusel Dinámico -->
+            <button class="carousel-nav-btn prev-btn" id="picsPrevBtn" aria-label="Anterior">
+              <span>‹</span>
+            </button>
+            <button class="carousel-nav-btn next-btn" id="picsNextBtn" aria-label="Siguiente">
+              <span>›</span>
+            </button>
+          </div>
+
+          <!-- Barra de Control Inferior: Thumbnails & Progreso -->
+          <div class="carousel-bottom-panel glass-bar">
+            <div class="carousel-info-summary">
+              <span class="current-slide-num" id="picsCurrentDisplay">01</span>
+              <div class="carousel-progress-track">
+                <div class="carousel-progress-bar" id="picsProgressBar"></div>
+              </div>
+              <span class="total-slide-num" id="picsTotalDisplay">06</span>
+            </div>
+
+            <div class="carousel-thumbnails-strip" id="picsThumbStrip">
+              <!-- Miniaturas autogeneradas por JS -->
+            </div>
+
+            <div class="carousel-autoplay-toggle">
+              <button class="btn-autoplay active" id="picsAutoplayBtn">
+                <span class="status-symbol">❚❚</span> AUTO
+              </button>
+            </div>
+          </div>
+        </div>
+
+      </div>
+    </section>
+
+    <!-- ==============================================
+         PÁGINA INTERNA 2: SECCIÓN 360 (ESCULTURA ROTATORIA)
+         LA OBRA GIRA ALREDEDOR DE SÍ MISMA EN UN PUNTO FIJO
+         ============================================== -->
+    <section class="page-section section-360 bg-darker" id="section360">
+      <div class="section-container">
+        
+        <div class="section-heading-split">
+          <div class="heading-left">
+            <span class="section-category-tag">ESCULTURA ESPACIAL // SALA B</span>
+            <h2 class="section-big-title gotham-ultra">
+              SECCIÓN<br>360°
+            </h2>
+          </div>
+          <div class="heading-right">
+            <p class="section-lead-text">
+              La obra gira sobre su propio eje central en un punto estático. Arrastra con el cursor o toca la pantalla para examinar cada faceta, modificar la velocidad orbital y alternar entre los monolitos de la colección.
+            </p>
+            <div class="sculpture-selector-bar glass-bar">
+              <button class="sculpture-tab-btn active" data-sculpture="monolith">01 // MONOLITO OBSIDIANA</button>
+              <button class="sculpture-tab-btn" data-sculpture="prism">02 // PRISMA FRACTAL</button>
+              <button class="sculpture-tab-btn" data-sculpture="sphere">03 // ESFERA GEODÉSICA</button>
+            </div>
+          </div>
+        </div>
+
+        <!-- VISOR INTERACTIVO 360° -->
+        <div class="viewer-360-container glass-card" id="viewer360Card">
+          
+          <!-- Encabezado HUD del Visor -->
+          <div class="viewer-hud-header">
+            <div class="hud-left">
+              <span class="hud-status-badge"><span class="hud-dot"></span> VISTA 360° ACTIVA</span>
+              <span class="sculpture-cur-name" id="sculptureNameLabel">MONOLITO OBSIDIANA // 2026</span>
+            </div>
+            <div class="hud-right">
+              <span class="angle-readout">ÁNGULO: <strong id="angleDegree">0°</strong></span>
+            </div>
+          </div>
+
+          <!-- Escenario Central 3D -->
+          <div class="sculpture-360-stage" id="stage360">
+            <!-- Canvas de Renderizado 3D Interactivo en Tiempo Real -->
+            <canvas id="canvas360" class="canvas-360-render" width="900" height="600"></canvas>
+
+            <!-- Base / Pedestal Escultórico con Reflejo de Galería -->
+            <div class="gallery-pedestal-platform">
+              <div class="pedestal-top-surface"></div>
+              <div class="pedestal-shadow-radial"></div>
+            </div>
+
+            <!-- Indicador Táctil Central de Arrastre -->
+            <div class="drag-hint-pill glass-pill" id="dragHintPill">
+              <span class="drag-arrow">←</span>
+              <span>ARRASTRA CON EL MOUSE PARA GIRAR 360°</span>
+              <span class="drag-arrow">→</span>
+            </div>
+          </div>
+
+          <!-- Controles de Interacción 360° -->
+          <div class="viewer-controls-toolbar glass-bar">
+            <div class="toolbar-group">
+              <button class="tool-btn active" id="toggle360AutoBtn">
+                <span class="tool-icon" id="autoRotateIcon">❚❚</span>
+                <span>AUTO-ROTACIÓN</span>
+              </button>
+              <button class="tool-btn" id="reset360Btn">
+                <span class="tool-icon">↺</span>
+                <span>REINICIAR VISTA</span>
+              </button>
+            </div>
+
+            <div class="toolbar-group">
+              <label class="speed-slider-label">
+                <span>VELOCIDAD:</span>
+                <input type="range" id="speedSlider" min="0" max="3" step="0.2" value="1" class="custom-range">
+              </label>
+            </div>
+
+            <div class="toolbar-group">
+              <button class="tool-btn" id="wireframeToggleBtn">
+                <span class="tool-icon">▦</span>
+                <span>MODO ESTRUCTURA</span>
+              </button>
+            </div>
+          </div>
+
+        </div>
+
+      </div>
+    </section>
+
+    <!-- ==============================================
+         PÁGINA INTERNA 3: SECCIÓN L&S (LUZ & SONIDO)
+         EL USUARIO PUEDE RECORRER UN ESPACIO Y GIRAR 
+         ALREDEDOR DE LA OBRA CON EL MOUSE
+         ============================================== -->
+    <section class="page-section section-ls" id="ls">
+      <div class="section-container">
+        
+        <div class="section-heading-split">
+          <div class="heading-left">
+            <span class="section-category-tag">EXPERIENCIA INMERSIVA // SALA C</span>
+            <h2 class="section-big-title gotham-ultra">
+              SECCIÓN<br>L&amp;S
+            </h2>
+          </div>
+          <div class="heading-right">
+            <p class="section-lead-text">
+              <strong>Luz &amp; Sonido:</strong> Camina virtualmente por la sala de la galería. Mueve el cursor para girar la perspectiva alrededor de la instalación lumínica central. Tu proximidad modula el sintetizador espacial en tiempo real.
+            </p>
+            <div class="ls-tips-row">
+              <span class="tip-tag">🖱 Mover mouse: Girar vista</span>
+              <span class="tip-tag">⌨ W / A / S / D o Flechas: Caminar en el espacio</span>
+              <span class="tip-tag">🎛 Controles de Iluminación abajo</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- CONTENEDOR DE LA SALA VIRTUAL 3D L&S -->
+        <div class="virtual-gallery-room-wrapper glass-card" id="virtualRoomCard">
+          
+          <div class="room-hud-bar">
+            <div class="room-hud-item">
+              <span class="room-indicator-point"></span>
+              <span>SALA C: ESPACIO DE PENUMBRA</span>
+            </div>
+            <div class="room-hud-coords">
+              <span>POSICIÓN: X: <strong id="coordX">0.0</strong> | Z: <strong id="coordZ">3.5</strong> | VISTA: <strong id="coordAngle">0°</strong></span>
+            </div>
+            <div class="room-sound-indicator">
+              <span class="synth-indicator-pulse" id="synthPulse"></span>
+              <span id="synthStatusText">SINTETIZADOR LISTO</span>
+            </div>
+          </div>
+
+          <!-- Escenario 3D de la Galería -->
+          <div class="interactive-gallery-viewport" id="galleryViewport">
+            <!-- Canvas 3D que renderiza la perspectiva arquitectónica, muros, luces y la escultura central -->
+            <canvas id="virtualRoomCanvas" width="1000" height="650"></canvas>
+
+            <!-- Hotspots o puntos de información dentro del espacio -->
+            <div class="room-hotspot" id="hotspotCenter" style="top: 50%; left: 50%;">
+              <div class="hotspot-pulse"></div>
+              <div class="hotspot-card glass-card">
+                <h5>INSTALACIÓN LUMÍNICA: "VACÍO RESONANTE"</h5>
+                <p>Haces colimados de 5500K y generador de ondas sinusoidales reactivo.</p>
+              </div>
+            </div>
+
+            <!-- Controles virtuales en pantalla para dispositivos táctiles o mouse click -->
+            <div class="onscreen-nav-pad">
+              <button class="dpad-btn up" id="dpadUp" title="Avanzar">▲</button>
+              <div class="dpad-row">
+                <button class="dpad-btn left" id="dpadLeft" title="Desplazar a la izquierda">◀</button>
+                <button class="dpad-btn down" id="dpadDown" title="Retroceder">▼</button>
+                <button class="dpad-btn right" id="dpadRight" title="Desplazar a la derecha">▶</button>
+              </div>
+            </div>
+
+            <div class="walk-hint-box" id="walkHintBox">
+              <span>Haz clic y arrastra para orbitar el espacio // Pulsa W, S para acercarte o alejarte</span>
+            </div>
+          </div>
+
+          <!-- Barra de Herramientas de Luz y Sonido -->
+          <div class="room-environment-controls glass-bar">
+            <div class="env-control-item">
+              <label for="lightIntensityRange">INTENSIDAD DE LUZ DE SALA:</label>
+              <input type="range" id="lightIntensityRange" min="0.1" max="1" step="0.05" value="0.6" class="custom-range">
+            </div>
+
+            <div class="env-control-item">
+              <label for="spotlightColorSelect">TEMPERATURA LUMÍNICA:</label>
+              <select id="spotlightColorSelect" class="custom-select">
+                <option value="pure-white">Blanco Puro (6500K)</option>
+                <option value="warm-noir">Plata Suave (4500K)</option>
+                <option value="deep-contrast">Contraste Extremo</option>
+              </select>
+            </div>
+
+            <div class="env-control-item">
+              <button class="btn-synth-toggle" id="audioAmbientRoomBtn">
+                <span class="synth-icon">🔊</span>
+                <span id="roomAudioBtnText">RESONANCIA AMBIENTAL ON</span>
+              </button>
+            </div>
+          </div>
+
+        </div>
+
+      </div>
+    </section>
+
+    <!-- ==============================================
+         PÁGINA INTERNA: EL MUSEO
+         ============================================== -->
+    <section class="page-section section-museo" id="museo">
+      <div class="section-container">
+        
+        <div class="section-heading-split">
+          <div class="heading-left">
+            <span class="section-category-tag">INSTITUCIÓN &amp; ARQUITECTURA</span>
+            <h2 class="section-big-title gotham-ultra">
+              EL<br>MUSEO
+            </h2>
+          </div>
+          <div class="heading-right">
+            <p class="section-lead-text">
+              Fundado como un laboratorio de investigación estética sin distracciones cromáticas. GALERÍA CERO es un monolito arquitectónico de hormigón crudo, vidrio templado y silencio acústico diseñado para amplificar la experiencia de la obra.
+            </p>
+          </div>
+        </div>
+
+        <div class="museo-content-grid">
+          <!-- Columna Izquierda: Manifiesto y Filosofía -->
+          <div class="museo-manifesto-card glass-card">
+            <span class="card-eyebrow">MANIFIESTO RADICAL</span>
+            <h3 class="manifesto-title gotham-ultra">EL SILENCIO DEL COLOR</h3>
+            <p>
+              Despojar al arte del artificio del color es devolverle su estructura primigenia. La luz, el ángulo y la sombra son los verdaderos constructores del espacio escultórico y fotográfico.
+            </p>
+            <p>
+              En GALERÍA CERO, cada visitante no es un mero espectador pasivo, sino un punto de referencia móvil cuyas decisiones de movimiento transforman las obras en tiempo real.
+            </p>
+
+            <div class="curator-signature">
+              <div class="signature-line"></div>
+              <span class="curator-name">Dra. Valerie Duchamp</span>
+              <span class="curator-role">Directora Curatorial General</span>
+            </div>
+          </div>
+
+          <!-- Columna Derecha: Arquitectura & Salas -->
+          <div class="museo-stats-grid">
+            <div class="stat-card glass-card">
+              <span class="stat-big gotham-ultra">8.500m²</span>
+              <h4>Superficie Total</h4>
+              <p>Diseñada bajo proporciones áureas en tres niveles subterráneos de absorción acústica.</p>
+            </div>
+
+            <div class="stat-card glass-card">
+              <span class="stat-big gotham-ultra">03</span>
+              <h4>Pabellones Inmersivos</h4>
+              <p>Sala PICS (Fotografía), Sala 360° (Escultura Cinética) y Sala L&amp;S (Instalaciones reactivas).</p>
+            </div>
+
+            <div class="stat-card glass-card">
+              <span class="stat-big gotham-ultra">450+</span>
+              <h4>Obras en Acervo</h4>
+              <p>Desde maestros de la vanguardia constructivista hasta artistas del código algorítmico.</p>
+            </div>
+
+            <div class="stat-card glass-card">
+              <span class="stat-big gotham-ultra">100%</span>
+              <h4>Energía Cero Emisiones</h4>
+              <p>Climatización geotérmica pasiva y preservación de temperatura y humedad de grado suizo.</p>
+            </div>
+          </div>
+        </div>
+
+        <!-- Mosaico Fotográfico del Edificio -->
+        <div class="museum-gallery-mosaic">
+          <div class="mosaic-item glass-card">
+            <img src="assets/images/museum/museo1.jpg" onerror="this.onerror=null; this.src='https://images.unsplash.com/photo-1513694203232-719a280e022f?auto=format&fit=crop&w=800&q=80'" alt="Atrio Central" loading="lazy">
+            <span class="mosaic-caption">Atrio Central de Hormigón Pulido</span>
+          </div>
+          <div class="mosaic-item glass-card">
+            <img src="assets/images/museum/museo2.jpg" onerror="this.onerror=null; this.src='https://images.unsplash.com/photo-1579783900882-c0d3dad7b119?auto=format&fit=crop&w=800&q=80'" alt="Galería de Esculturas" loading="lazy">
+            <span class="mosaic-caption">Ala Oeste — Escultura y Volumen</span>
+          </div>
+          <div class="mosaic-item glass-card">
+            <img src="assets/images/museum/museo3.jpg" onerror="this.onerror=null; this.src='https://images.unsplash.com/photo-1600585154340-be6161a56a0c?auto=format&fit=crop&w=800&q=80'" alt="Pasillo de Penumbra" loading="lazy">
+            <span class="mosaic-caption">Pasaje de Transición Acústica</span>
+          </div>
+        </div>
+
+      </div>
+    </section>
+
+    <!-- ==============================================
+         PÁGINA INTERNA: CONTACTO & RESERVAS
+         LAYOUT DIVIDIDO EN DOS
+         ============================================== -->
+    <section class="page-section section-contacto bg-darker" id="contacto">
+      <div class="section-container">
+        
+        <div class="split-container">
+          <!-- Lado Izquierdo: Información, Horarios y Ubicación -->
+          <div class="split-col split-text-col">
+            <span class="split-index">INFORMACIÓN &amp; ACCESOS</span>
+            <h2 class="split-title gotham-ultra">
+              CONTACTO &amp;<br>VISITAS
+            </h2>
+            <div class="split-divider"></div>
+            
+            <div class="contact-info-blocks">
+              <div class="info-block">
+                <h4>UBICACIÓN</h4>
+                <p>Avenida de las Artes 404, Distrito Monumental<br>C1004 Ciudad de la Cultura</p>
+              </div>
+
+              <div class="info-block">
+                <h4>HORARIOS DE ACCESO</h4>
+                <p>Martes a Domingo: 11:00 — 21:00 hs<br>Jueves Nocturnos (Acceso L&amp;S especial): Hasta las 23:30 hs<br>Lunes: Mantenimiento y montaje curatorial</p>
+              </div>
+
+              <div class="info-block">
+                <h4>ADMISIÓN</h4>
+                <p>Entrada General: $12 // Estudiantes y Membresías: Acceso Libre<br>Recorridos Privados y Grupos: Requiere reserva previa</p>
+              </div>
+
+              <div class="info-block">
+                <h4>LÍNEAS DIRECTAS</h4>
+                <p>curaduria@galeriacero.art<br>+54 (11) 4802-0000</p>
+              </div>
+            </div>
+          </div>
+
+          <!-- Lado Derecho: Formulario Estilo Glass -->
+          <div class="split-col split-interactive-col">
+            <div class="contact-form-card glass-card">
+              <div class="form-header">
+                <span class="form-badge">RESERVAS &amp; PREGUNTAS</span>
+                <h3 class="form-title gotham-ultra">SOLICITUD DE VISITA</h3>
+                <p class="form-subtitle">Completa el formulario para coordinar visitas guiadas, acceso de prensa o consultas curatoriales.</p>
+              </div>
+
+              <form id="contactForm" class="minimal-contact-form" novalidate>
+                <div class="form-group">
+                  <label for="contactName">NOMBRE COMPLETO *</label>
+                  <input type="text" id="contactName" name="name" placeholder="Ej. Ana Beltrán" required>
+                  <span class="input-error" id="nameError"></span>
+                </div>
+
+                <div class="form-row">
+                  <div class="form-group">
+                    <label for="contactEmail">CORREO ELECTRÓNICO *</label>
+                    <input type="email" id="contactEmail" name="email" placeholder="ejemplo@correo.com" required>
+                    <span class="input-error" id="emailError"></span>
+                  </div>
+                  <div class="form-group">
+                    <label for="contactDate">FECHA PREFERIDA</label>
+                    <input type="date" id="contactDate" name="visitDate">
+                  </div>
+                </div>
+
+                <div class="form-group">
+                  <label for="contactInterest">SALA O MOTIVO DE INTERÉS</label>
+                  <select id="contactInterest" name="interest" class="custom-select">
+                    <option value="todas">Recorrido Completo (Todas las Salas)</option>
+                    <option value="pics">Sección PICS — Fotografía</option>
+                    <option value="360">Sección 360° — Escultura</option>
+                    <option value="ls">Sección L&amp;S — Luz &amp; Sonido</option>
+                    <option value="prensa">Acreditación de Prensa / Curaduría</option>
+                  </select>
+                </div>
+
+                <div class="form-group">
+                  <label for="contactMessage">MENSAJE O COMENTARIOS *</label>
+                  <textarea id="contactMessage" name="message" rows="4" placeholder="Escribe tus requerimientos especiales o dudas..." required></textarea>
+                  <span class="input-error" id="messageError"></span>
+                </div>
+
+                <div class="form-action">
+                  <button type="submit" class="btn-primary glass-btn btn-full">
+                    <span>ENVIAR SOLICITUD</span>
+                    <span class="btn-arrow">→</span>
+                  </button>
+                </div>
+              </form>
+
+              <!-- Modal / Alerta de Éxito de Envío -->
+              <div class="form-success-message glass-card" id="formSuccessMessage">
+                <div class="success-icon">✓</div>
+                <h4 class="gotham-ultra">SOLICITUD REGISTRADA</h4>
+                <p>Hemos recibido tu mensaje. Nuestro equipo de recepción curatorial te contactará dentro de las próximas 24 horas hábiles.</p>
+                <button class="btn-secondary" id="btnDismissSuccess">NUEVO MENSAJE</button>
+              </div>
+
+            </div>
+          </div>
+        </div>
+
+      </div>
+    </section>
+
+  </main>
+
+  <!-- ==============================================
+       MODAL LIGHTBOX PARA INSPECCIÓN DE FOTOGRAFÍAS
+       ============================================== -->
+  <div class="lightbox-modal" id="lightboxModal" aria-hidden="true" role="dialog">
+    <div class="lightbox-backdrop" id="lightboxBackdrop"></div>
+    <div class="lightbox-dialog glass-card">
+      <button class="lightbox-close-btn" id="lightboxCloseBtn" aria-label="Cerrar modal">✕</button>
+      <div class="lightbox-content">
+        <div class="lightbox-image-wrap">
+          <img src="" alt="Fotografía ampliada" id="lightboxImg">
+        </div>
+        <div class="lightbox-sidebar">
+          <span class="lightbox-category" id="lightboxCategory">FOTOGRAFÍA</span>
+          <h3 class="lightbox-title gotham-ultra" id="lightboxTitle">Título de la Obra</h3>
+          <p class="lightbox-artist" id="lightboxArtist">Artista</p>
+          <div class="lightbox-details-grid">
+            <div class="detail-cell">
+              <span class="detail-label">AÑO</span>
+              <span class="detail-value" id="lightboxYear">2024</span>
+            </div>
+            <div class="detail-cell">
+              <span class="detail-label">DISPOSITIVO</span>
+              <span class="detail-value" id="lightboxCamera">Hasselblad H6D</span>
+            </div>
+            <div class="detail-cell">
+              <span class="detail-label">SOPORTE</span>
+              <span class="detail-value">Plata sobre gelatina 1/1</span>
+            </div>
+            <div class="detail-cell">
+              <span class="detail-label">UBICACIÓN</span>
+              <span class="detail-value">Sala A — Muro Norte</span>
+            </div>
+          </div>
+          <div class="lightbox-cta">
+            <button class="btn-secondary" id="lightboxPrevBtn">← ANTERIOR</button>
+            <button class="btn-secondary" id="lightboxNextBtn">SIGUIENTE →</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- TOAST DE NOTIFICACIÓN SUTIL -->
+  <div class="toast-notification glass-pill" id="globalToast">
+    <span class="toast-symbol">ℹ</span>
+    <span class="toast-text" id="toastText">Audio ambiental activado</span>
+  </div>
+
+  <!-- ==============================================
+       FOOTER MINIMALISTA MONOCROMÁTICO
+       ============================================== -->
+  <footer class="main-footer">
+    <div class="footer-container">
+      <div class="footer-top">
+        <div class="footer-brand">
+          <span class="footer-logo gotham-ultra">GALERÍA CERO</span>
+          <p class="footer-motto">La presencia de la forma a través de la ausencia del color.</p>
+        </div>
+        <div class="footer-nav-columns">
+          <div class="footer-col">
+            <h5>SALAS</h5>
+            <ul>
+              <li><a href="#pics" data-nav="pics">Sección PICS (Fotografía)</a></li>
+              <li><a href="#section360" data-nav="section360">Sección 360° (Escultura)</a></li>
+              <li><a href="#ls" data-nav="ls">Sección L&amp;S (Luz &amp; Sonido)</a></li>
+            </ul>
+          </div>
+          <div class="footer-col">
+            <h5>MUSEO</h5>
+            <ul>
+              <li><a href="#museo" data-nav="museo">Historia &amp; Arquitectura</a></li>
+              <li><a href="#museo" data-nav="museo">Comité Curatorial</a></li>
+              <li><a href="#contacto" data-nav="contacto">Admisión &amp; Accesibilidad</a></li>
+            </ul>
+          </div>
+          <div class="footer-col">
+            <h5>CONECTAR</h5>
+            <ul>
+              <li><a href="mailto:info@galeriacero.art">info@galeriacero.art</a></li>
+              <li><a href="#contacto" data-nav="contacto">Prensa &amp; Catálogo</a></li>
+              <li><span class="social-tags">IG // BE // TW</span></li>
+            </ul>
+          </div>
+        </div>
+      </div>
+      <div class="footer-bottom">
+        <p>© 2026 GALERÍA CERO — TODOS LOS DERECHOS RESERVADOS // ESTÉTICA MONOCROMÁTICA</p>
+        <p class="footer-coords">34°35'04.2"S 58°23'19.1"W</p>
+      </div>
+    </div>
+  </footer>
+
+  <script src="script.js"></script>
+</body>
+</html>
