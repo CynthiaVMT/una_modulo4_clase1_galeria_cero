@@ -674,37 +674,74 @@ body {
 }
 
 /* --------------------------------------------------------------------------
-   5. ACCESO DIRECTO 1: CARRUSEL SLIDER ANIMADO EN HOME
+   5. ACCESO DIRECTO 1: CARRUSEL SLIDER 3D VERTICAL (RUEDA EN EJE VERTICAL)
    -------------------------------------------------------------------------- */
+.direct-slider-module {
+  position: relative;
+  overflow: hidden;
+  cursor: pointer;
+  user-select: none;
+}
+
 .direct-slider-module .slider-viewport {
   position: relative;
   width: 100%;
   height: 100%;
   overflow: hidden;
+  perspective: 1200px;
+  perspective-origin: 50% 50%;
 }
 
 .slider-track {
   position: relative;
   width: 100%;
   height: 100%;
+  transform-style: preserve-3d;
 }
 
 .home-slide {
   position: absolute;
-  top: 0;
-  left: 0;
+  inset: 0;
   width: 100%;
   height: 100%;
   opacity: 0;
   visibility: hidden;
-  transform: scale(1.05);
-  transition: opacity 0.8s cubic-bezier(0.16, 1, 0.3, 1), transform 0.8s cubic-bezier(0.16, 1, 0.3, 1);
+  pointer-events: none;
+  /* Estado inicial en espera (arriba, inclinado y ligeramente atrás en la rueda 3D) */
+  transform: translateY(-80%) translateZ(-160px) rotateX(24deg) scale(0.9);
+  transform-origin: center center;
+  transition: transform 1.2s cubic-bezier(0.22, 1, 0.36, 1), 
+              opacity 1.2s cubic-bezier(0.22, 1, 0.36, 1), 
+              visibility 1.2s;
+  will-change: transform, opacity;
+  z-index: 1;
 }
 
+/* Foto activa en el frente (se acerca con zoom sutil) */
 .home-slide.active {
   opacity: 1;
   visibility: visible;
-  transform: scale(1);
+  pointer-events: auto;
+  z-index: 3;
+  transform: translateY(0%) translateZ(0px) rotateX(0deg) scale(1);
+  transition: transform 1.2s cubic-bezier(0.22, 1, 0.36, 1), 
+              opacity 1.2s cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.home-slide.active img {
+  transform: scale(1.05);
+  transition: transform 5s cubic-bezier(0.1, 1, 0.2, 1), filter 0.8s ease;
+}
+
+/* La foto que se oculta lo hace hacia abajo y hacia atrás como en una rueda */
+.home-slide.exit-down {
+  opacity: 0;
+  visibility: visible;
+  pointer-events: none;
+  z-index: 2;
+  transform: translateY(85%) translateZ(-250px) rotateX(-30deg) scale(0.82);
+  transition: transform 1.2s cubic-bezier(0.22, 1, 0.36, 1), 
+              opacity 0.9s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
 .home-slide img {
@@ -712,6 +749,7 @@ body {
   height: 100%;
   object-fit: cover;
   filter: grayscale(100%) contrast(120%);
+  transition: transform 1.2s cubic-bezier(0.22, 1, 0.36, 1), filter 0.6s ease;
 }
 
 .glass-caption {
@@ -720,11 +758,21 @@ body {
   left: 1.2rem;
   right: 1.2rem;
   padding: 1.2rem 1.6rem;
-  background: rgba(10, 10, 10, 0.7);
+  background: rgba(10, 10, 10, 0.75);
   backdrop-filter: blur(16px);
   -webkit-backdrop-filter: blur(16px);
   border: 1px solid rgba(255, 255, 255, 0.15);
   border-radius: 2px;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5);
+  opacity: 0;
+  transform: translateY(16px);
+  transition: opacity 0.8s cubic-bezier(0.22, 1, 0.36, 1) 0.2s, 
+              transform 0.8s cubic-bezier(0.22, 1, 0.36, 1) 0.2s;
+}
+
+.home-slide.active .glass-caption {
+  opacity: 1;
+  transform: translateY(0);
 }
 
 .caption-artist {
@@ -742,19 +790,9 @@ body {
   margin-top: 0.2rem;
 }
 
+/* Ocultar avanzadores e indicadores de posición */
 .slider-controls-bar {
-  position: absolute;
-  bottom: 1.2rem;
-  right: 1.2rem;
-  z-index: 20;
-  display: flex;
-  align-items: center;
-  gap: 1.2rem;
-  background: rgba(0, 0, 0, 0.75);
-  padding: 0.4rem 0.8rem;
-  border-radius: 30px;
-  border: 1px solid rgba(255, 255, 255, 0.2);
-  backdrop-filter: blur(12px);
+  display: none !important;
 }
 
 .slider-counter {
@@ -1697,12 +1735,131 @@ body {
   background-color: var(--color-black);
   overflow: hidden;
   cursor: crosshair;
+  user-select: none;
 }
 
 #virtualRoomCanvas {
   width: 100%;
   height: 100%;
   display: block;
+}
+
+/* Retícula FPS estilo Videojuego 3D */
+.fps-crosshair {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  pointer-events: none;
+  z-index: 15;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  opacity: 0.85;
+  transition: opacity 0.3s ease, transform 0.2s ease;
+}
+
+.fps-crosshair.active {
+  opacity: 1;
+  transform: translate(-50%, -50%) scale(1.25);
+}
+
+.crosshair-dot {
+  width: 4px;
+  height: 4px;
+  background-color: #ffffff;
+  border-radius: 50%;
+  box-shadow: 0 0 6px rgba(255, 255, 255, 0.95);
+}
+
+.crosshair-lines {
+  position: absolute;
+  inset: 0;
+}
+
+.crosshair-lines::before,
+.crosshair-lines::after {
+  content: '';
+  position: absolute;
+  background: rgba(255, 255, 255, 0.6);
+}
+
+.crosshair-lines::before {
+  top: 50%;
+  left: 2px;
+  right: 2px;
+  height: 1px;
+  transform: translateY(-50%);
+}
+
+.crosshair-lines::after {
+  left: 50%;
+  top: 2px;
+  bottom: 2px;
+  width: 1px;
+  transform: translateX(-50%);
+}
+
+/* Radar / Minimap 3D */
+.room-minimap-radar {
+  position: absolute;
+  top: 1.2rem;
+  right: 1.2rem;
+  z-index: 15;
+  background: rgba(10, 12, 18, 0.85);
+  backdrop-filter: blur(10px);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  border-radius: 8px;
+  padding: 0.35rem 0.5rem;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.2rem;
+  box-shadow: 0 4px 20px rgba(0,0,0,0.6);
+  pointer-events: none;
+}
+
+.radar-label {
+  font-size: 0.6rem;
+  font-family: var(--font-gotham);
+  letter-spacing: 0.1em;
+  color: var(--color-gray-300);
+}
+
+#minimapCanvas {
+  border-radius: 4px;
+  display: block;
+}
+
+/* Botón de fijación de modo videojuego */
+.btn-fps-mode {
+  position: absolute;
+  top: 1.2rem;
+  left: 1.2rem;
+  z-index: 15;
+  font-size: 0.72rem;
+  padding: 0.45rem 0.9rem;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  background: rgba(15, 15, 15, 0.8);
+  border: 1px solid rgba(255, 255, 255, 0.25);
+  border-radius: 20px;
+  color: #fff;
+  cursor: pointer;
+  transition: all var(--trans-fast);
+}
+
+.btn-fps-mode:hover, .btn-fps-mode.active {
+  background: rgba(255, 255, 255, 0.25);
+  border-color: #fff;
+  box-shadow: 0 0 15px rgba(255, 255, 255, 0.35);
+}
+
+.btn-fps-mode.active .game-icon {
+  animation: pulseDot 1.2s infinite;
 }
 
 /* Hotspot interactivo */

@@ -1,102 +1,66 @@
 /**
- * GALERÍA CERO — SCRIPT PRINCIPAL
- * - Navegación fluida y menú móvil
- * - Motor de Audio Espacial y Ambiental (Web Audio API)
- * - Acceso 1 (Home): Carrusel Slider Animado
- * - Acceso 2 (Home): Escultura 360 en Canvas
- * - Acceso 3 (Home): Obra Interactiva con Destello Sutil reactivo al mouse
- * - Sección PICS: Carrusel Dinámico completo con filtros y Lightbox modal
- * - Sección 360°: Visor de escultura con rotación interactiva sobre punto fijo
- * - Sección L&S: Recorrido 3D en espacio de galería con giro orbital por mouse
- * - Validación y manejo de formulario de contacto
+ * GALERÍA CERO — SCRIPT v2.0
+ * ─────────────────────────────────────────────────────
+ * MEJORAS v2:
+ *  - Home Acceso 2: Escultura 3D con materialidad mármol+metal, luces especulares
+ *  - Sección 360: Monolito de cristal con reflejos prismáticos internos
+ *  - Sección L&S: Pantalla completa immersiva, animación de entrada "vuelo" a la sala,
+ *    piso de vidrio oscuro con partículas flotantes, pantallas laterales interactivas
+ *    con partículas/ondas al tocar con el mouse, iluminación cenital reactiva
+ * ─────────────────────────────────────────────────────
  */
 
 document.addEventListener('DOMContentLoaded', () => {
 
-  /* ==========================================================================
-     1. SISTEMA DE AUDIO AMBIENTAL Y SINTETIZADOR (WEB AUDIO API)
-     ========================================================================== */
+  /* ══════════════════════════════════════════════════════════════
+     1. MOTOR DE AUDIO (Web Audio API + soporte archivo local)
+     ══════════════════════════════════════════════════════════════ */
   class GalleryAudioEngine {
     constructor() {
-      this.ctx = null;
-      this.isPlaying = false;
-      this.oscillators = [];
-      this.gainNode = null;
-      this.filterNode = null;
-      this.isInitialized = false;
-      this.customAudio = null;
-      this.hasCustomAudio = false;
+      this.ctx = null; this.isPlaying = false;
+      this.oscillators = []; this.gainNode = null;
+      this.filterNode = null; this.isInitialized = false;
+      this.customAudio = null; this.hasCustomAudio = false;
     }
-
     init() {
       if (this.isInitialized) return;
       try {
         const AudioContext = window.AudioContext || window.webkitAudioContext;
         this.ctx = new AudioContext();
-
-        // Nodo principal de ganancia y filtro analógico
         this.gainNode = this.ctx.createGain();
         this.gainNode.gain.setValueAtTime(0.001, this.ctx.currentTime);
-
         this.filterNode = this.ctx.createBiquadFilter();
         this.filterNode.type = 'lowpass';
         this.filterNode.frequency.setValueAtTime(450, this.ctx.currentTime);
         this.filterNode.Q.setValueAtTime(4, this.ctx.currentTime);
-
         this.filterNode.connect(this.gainNode);
         this.gainNode.connect(this.ctx.destination);
-
-        // Soporte para archivo de audio local assets/audio/ambient.mp3
         this.customAudio = new Audio('assets/audio/ambient.mp3');
         this.customAudio.loop = true;
         this.customAudio.volume = 0.4;
-
         this.isInitialized = true;
-      } catch (e) {
-        console.warn('Web Audio API no soportado en este navegador:', e);
-      }
+      } catch (e) { console.warn('Web Audio API:', e); }
     }
-
     toggle() {
       this.init();
       if (!this.ctx) return false;
-
-      if (this.ctx.state === 'suspended') {
-        this.ctx.resume();
-      }
-
-      if (this.isPlaying) {
-        this.stop();
-        return false;
-      } else {
-        this.start();
-        return true;
-      }
+      if (this.ctx.state === 'suspended') this.ctx.resume();
+      if (this.isPlaying) { this.stop(); return false; }
+      else { this.start(); return true; }
     }
-
     start() {
       if (this.isPlaying) return;
-
-      // 1. Intentar reproducir archivo local de usuario si está disponible
       if (this.customAudio) {
-        const playPromise = this.customAudio.play();
-        if (playPromise !== undefined) {
-          playPromise.then(() => {
-            this.hasCustomAudio = true;
-            this.isPlaying = true;
-          }).catch(() => {
-            // Si el archivo no existe aún, activar el sintetizador generativo Web Audio API
-            this.hasCustomAudio = false;
-            this.startProceduralSynth();
-          });
+        const p = this.customAudio.play();
+        if (p !== undefined) {
+          p.then(() => { this.hasCustomAudio = true; this.isPlaying = true; })
+           .catch(() => { this.hasCustomAudio = false; this._startSynth(); });
           return;
         }
       }
-
-      this.startProceduralSynth();
+      this._startSynth();
     }
-
-    startProceduralSynth() {
+    _startSynth() {
       if (!this.ctx) return;
       const freqs = [65.41, 98.00, 155.56, 233.08];
       this.oscillators = freqs.map((f, i) => {
@@ -104,1201 +68,1246 @@ document.addEventListener('DOMContentLoaded', () => {
         osc.type = i % 2 === 0 ? 'sine' : 'triangle';
         osc.frequency.setValueAtTime(f, this.ctx.currentTime);
         osc.detune.setValueAtTime((i - 1.5) * 4, this.ctx.currentTime);
-
-        const oscGain = this.ctx.createGain();
-        oscGain.gain.setValueAtTime(0.18 / freqs.length, this.ctx.currentTime);
-
-        osc.connect(oscGain);
-        oscGain.connect(this.filterNode);
-        osc.start();
+        const g = this.ctx.createGain();
+        g.gain.setValueAtTime(0.18 / freqs.length, this.ctx.currentTime);
+        osc.connect(g); g.connect(this.filterNode); osc.start();
         return osc;
       });
-
       this.gainNode.gain.cancelScheduledValues(this.ctx.currentTime);
       this.gainNode.gain.linearRampToValueAtTime(0.15, this.ctx.currentTime + 2);
       this.isPlaying = true;
     }
-
     stop() {
       if (!this.isPlaying) return;
-
       if (this.hasCustomAudio && this.customAudio) {
-        this.customAudio.pause();
-        this.customAudio.currentTime = 0;
-        this.isPlaying = false;
-        return;
+        this.customAudio.pause(); this.customAudio.currentTime = 0;
+        this.isPlaying = false; return;
       }
-
       if (this.ctx && this.gainNode) {
         this.gainNode.gain.cancelScheduledValues(this.ctx.currentTime);
         this.gainNode.gain.linearRampToValueAtTime(0.0001, this.ctx.currentTime + 1.2);
         setTimeout(() => {
-          this.oscillators.forEach(osc => {
-            try { osc.stop(); osc.disconnect(); } catch (e) {}
-          });
-          this.oscillators = [];
-          this.isPlaying = false;
+          this.oscillators.forEach(o => { try { o.stop(); o.disconnect(); } catch(e){} });
+          this.oscillators = []; this.isPlaying = false;
         }, 1200);
       }
     }
-
-    modulate(proximity, angle) {
+    modulate(proximity) {
       if (this.hasCustomAudio && this.customAudio) {
-        // Modular volumen según distancia
-        const targetVol = Math.max(0.15, Math.min(0.8, 1 - proximity * 0.5));
-        this.customAudio.volume = targetVol;
+        this.customAudio.volume = Math.max(0.1, Math.min(0.8, 1 - proximity * 0.4));
         return;
       }
-
       if (!this.ctx || !this.isPlaying || !this.filterNode) return;
-      const targetFreq = 250 + (1 - Math.min(1, Math.max(0, proximity))) * 1200;
-      this.filterNode.frequency.setTargetAtTime(targetFreq, this.ctx.currentTime, 0.1);
+      const freq = 250 + (1 - Math.min(1, Math.max(0, proximity))) * 1200;
+      this.filterNode.frequency.setTargetAtTime(freq, this.ctx.currentTime, 0.1);
     }
-
     playGlintChime(freq = 528) {
       this.init();
-      // Intentar chime local si el usuario colocó chime.mp3
-      const customChime = new Audio('assets/audio/chime.mp3');
-      const chimePromise = customChime.play();
-      if (chimePromise !== undefined) {
-        chimePromise.catch(() => {
-          this.playProceduralChime(freq);
-        });
-      } else {
-        this.playProceduralChime(freq);
-      }
+      const c = new Audio('assets/audio/chime.mp3');
+      c.play().catch(() => this._proceduralChime(freq));
     }
-
-    playProceduralChime(freq) {
+    _proceduralChime(freq) {
       if (!this.ctx) return;
       if (this.ctx.state === 'suspended') this.ctx.resume();
-
       const osc = this.ctx.createOscillator();
-      const gain = this.ctx.createGain();
-      osc.type = 'sine';
-      osc.frequency.setValueAtTime(freq, this.ctx.currentTime);
-
-      gain.gain.setValueAtTime(0.1, this.ctx.currentTime);
-      gain.gain.exponentialRampToValueAtTime(0.0001, this.ctx.currentTime + 1.5);
-
-      osc.connect(gain);
-      gain.connect(this.ctx.destination);
-      osc.start();
-      osc.stop(this.ctx.currentTime + 1.5);
+      const g = this.ctx.createGain();
+      osc.type = 'sine'; osc.frequency.setValueAtTime(freq, this.ctx.currentTime);
+      g.gain.setValueAtTime(0.1, this.ctx.currentTime);
+      g.gain.exponentialRampToValueAtTime(0.0001, this.ctx.currentTime + 1.5);
+      osc.connect(g); g.connect(this.ctx.destination);
+      osc.start(); osc.stop(this.ctx.currentTime + 1.5);
     }
   }
-
   const galleryAudio = new GalleryAudioEngine();
 
-  // Control de sonido en la Navbar
+  /* ══════════════════════════════════════════════════════════════
+     2. NAVEGACIÓN, TOAST, MENÚ MÓVIL
+     ══════════════════════════════════════════════════════════════ */
+  const mainNavbar    = document.getElementById('mainNavbar');
+  const mobileMenuBtn = document.getElementById('mobileMenuBtn');
+  const navMenu       = document.getElementById('navMenu');
+  const navLinks      = document.querySelectorAll('.nav-link');
+  const globalToast   = document.getElementById('globalToast');
+  const toastText     = document.getElementById('toastText');
   const soundToggleBtn = document.getElementById('soundToggleBtn');
-  const soundLabel = soundToggleBtn ? soundToggleBtn.querySelector('.sound-label') : null;
+  const soundLabel    = soundToggleBtn ? soundToggleBtn.querySelector('.sound-label') : null;
+  let toastTimeout = null;
+
+  function showToast(msg) {
+    if (!globalToast || !toastText) return;
+    toastText.textContent = msg;
+    globalToast.classList.add('active');
+    clearTimeout(toastTimeout);
+    toastTimeout = setTimeout(() => globalToast.classList.remove('active'), 3200);
+  }
 
   function updateSoundUI(active) {
     if (!soundToggleBtn) return;
-    if (active) {
-      soundToggleBtn.classList.add('playing');
-      if (soundLabel) soundLabel.textContent = 'AUDIO ON';
-      showToast('Paisaje sonoro espacial activado');
-    } else {
-      soundToggleBtn.classList.remove('playing');
-      if (soundLabel) soundLabel.textContent = 'AUDIO OFF';
-      showToast('Audio en silencio');
-    }
+    soundToggleBtn.classList.toggle('playing', active);
+    if (soundLabel) soundLabel.textContent = active ? 'AUDIO ON' : 'AUDIO OFF';
+    showToast(active ? 'Paisaje sonoro activado' : 'Audio en silencio');
   }
 
-  if (soundToggleBtn) {
-    soundToggleBtn.addEventListener('click', () => {
-      const isNowPlaying = galleryAudio.toggle();
-      updateSoundUI(isNowPlaying);
-    });
-  }
+  if (soundToggleBtn) soundToggleBtn.addEventListener('click', () => updateSoundUI(galleryAudio.toggle()));
 
-  /* ==========================================================================
-     2. NAVEGACIÓN, MENÚ MÓVIL Y TOAST NOTIFIER
-     ========================================================================== */
-  const mainNavbar = document.getElementById('mainNavbar');
-  const mobileMenuBtn = document.getElementById('mobileMenuBtn');
-  const navMenu = document.getElementById('navMenu');
-  const navLinks = document.querySelectorAll('.nav-link');
-  const globalToast = document.getElementById('globalToast');
-  const toastText = document.getElementById('toastText');
-  let toastTimeout = null;
-
-  function showToast(message) {
-    if (!globalToast || !toastText) return;
-    toastText.textContent = message;
-    globalToast.classList.add('active');
-    clearTimeout(toastTimeout);
-    toastTimeout = setTimeout(() => {
-      globalToast.classList.remove('active');
-    }, 3200);
-  }
-
-  // Scroll navbar styling
   window.addEventListener('scroll', () => {
-    if (window.scrollY > 40) {
-      mainNavbar.classList.add('scrolled');
-    } else {
-      mainNavbar.classList.remove('scrolled');
-    }
-    highlightCurrentSection();
+    mainNavbar.classList.toggle('scrolled', window.scrollY > 40);
+    highlightSection();
   }, { passive: true });
 
-  // Menú móvil hamburguesa
   if (mobileMenuBtn && navMenu) {
-    mobileMenuBtn.addEventListener('click', () => {
-      navMenu.classList.toggle('mobile-open');
-    });
+    mobileMenuBtn.addEventListener('click', () => navMenu.classList.toggle('mobile-open'));
+    navLinks.forEach(l => l.addEventListener('click', () => navMenu.classList.remove('mobile-open')));
+  }
 
-    navLinks.forEach(link => {
-      link.addEventListener('click', () => {
-        navMenu.classList.remove('mobile-open');
-      });
+  const sections = document.querySelectorAll('section[id]');
+  function highlightSection() {
+    const sp = window.scrollY + 200;
+    sections.forEach(s => {
+      if (sp >= s.offsetTop && sp < s.offsetTop + s.offsetHeight)
+        navLinks.forEach(l => l.classList.toggle('active', l.dataset.nav === s.id));
     });
   }
 
-  // Resaltado de enlaces según la sección visible
-  const observedSections = document.querySelectorAll('section[id]');
-  function highlightCurrentSection() {
-    const scrollPos = window.scrollY + 200;
-    observedSections.forEach(sec => {
-      const top = sec.offsetTop;
-      const height = sec.offsetHeight;
-      const id = sec.getAttribute('id');
-      if (scrollPos >= top && scrollPos < top + height) {
-        navLinks.forEach(link => {
-          link.classList.toggle('active', link.getAttribute('data-nav') === id);
-        });
+  /* ══════════════════════════════════════════════════════════════
+     3. HOME: CARRUSEL SLIDER 3D VERTICAL (ACCESO 1 - RUEDA 3D)
+     ══════════════════════════════════════════════════════════════ */
+  const homeSlides       = document.querySelectorAll('.home-slide');
+  const homeCarouselMod  = document.getElementById('homeDirectCarousel');
+  let curHomeSlide = 0, homeTimer = null, isHomeTransitioning = false;
+
+  function showHomeSlide(nextIdx) {
+    if (!homeSlides.length || isHomeTransitioning) return;
+    nextIdx = ((nextIdx % homeSlides.length) + homeSlides.length) % homeSlides.length;
+    if (nextIdx === curHomeSlide && homeSlides[curHomeSlide].classList.contains('active')) return;
+
+    isHomeTransitioning = true;
+    const currentSlide = homeSlides[curHomeSlide];
+    const nextSlide = homeSlides[nextIdx];
+
+    // Limpiar clases de slides inactivas para dejarlas en posición de espera superior
+    homeSlides.forEach((s, idx) => {
+      if (idx !== curHomeSlide && idx !== nextIdx) {
+        s.className = 'home-slide';
+      }
+    });
+
+    // La foto de frente se oculta hacia abajo y hacia atrás como en una rueda
+    if (currentSlide && currentSlide !== nextSlide) {
+      currentSlide.className = 'home-slide exit-down';
+    }
+
+    // La siguiente se incorpora al centro desde arriba y hacia abajo
+    nextSlide.className = 'home-slide active';
+    curHomeSlide = nextIdx;
+
+    setTimeout(() => {
+      homeSlides.forEach((s, idx) => {
+        if (idx !== curHomeSlide) {
+          s.className = 'home-slide';
+        }
+      });
+      isHomeTransitioning = false;
+    }, 1200);
+  }
+
+  function startHomeAuto() {
+    clearInterval(homeTimer);
+    if (homeSlides.length > 1) {
+      homeTimer = setInterval(() => {
+        showHomeSlide(curHomeSlide + 1);
+      }, 4200);
+    }
+  }
+
+  if (homeCarouselMod) {
+    homeCarouselMod.addEventListener('mouseenter', () => clearInterval(homeTimer));
+    homeCarouselMod.addEventListener('mouseleave', startHomeAuto);
+
+    // Permitir interacción por toque/swipe vertical
+    let startY = 0;
+    homeCarouselMod.addEventListener('touchstart', (e) => {
+      startY = e.touches[0].clientY;
+    }, { passive: true });
+
+    homeCarouselMod.addEventListener('touchend', (e) => {
+      const diffY = e.changedTouches[0].clientY - startY;
+      if (Math.abs(diffY) > 40) {
+        if (diffY < 0) showHomeSlide(curHomeSlide + 1);
+        else showHomeSlide(curHomeSlide - 1);
+        startHomeAuto();
+      }
+    }, { passive: true });
+
+    // Clic en la tarjeta avanza suavemente a la siguiente obra
+    homeCarouselMod.addEventListener('click', (e) => {
+      if (!e.target.closest('a')) {
+        showHomeSlide(curHomeSlide + 1);
+        startHomeAuto();
       }
     });
   }
 
-  /* ==========================================================================
-     3. ACCESO DIRECTO 1 (HOME): CARRUSEL SLIDER ANIMADO
-     ========================================================================== */
-  const homeSlides = document.querySelectorAll('.home-slide');
-  const homeSlideCurrent = document.getElementById('homeSlideCurrent');
-  const homeSliderPrev = document.getElementById('homeSliderPrev');
-  const homeSliderNext = document.getElementById('homeSliderNext');
-  const homeCarouselModule = document.getElementById('homeDirectCarousel');
-  let currentHomeSlide = 0;
-  let homeAutoplayTimer = null;
-
-  function showHomeSlide(idx) {
-    if (!homeSlides.length) return;
-    if (idx >= homeSlides.length) idx = 0;
-    if (idx < 0) idx = homeSlides.length - 1;
-
-    homeSlides.forEach((slide, i) => {
-      slide.classList.toggle('active', i === idx);
-    });
-
-    currentHomeSlide = idx;
-    if (homeSlideCurrent) {
-      homeSlideCurrent.textContent = String(idx + 1).padStart(2, '0');
-    }
-  }
-
-  function startHomeAutoplay() {
-    stopHomeAutoplay();
-    homeAutoplayTimer = setInterval(() => {
-      showHomeSlide(currentHomeSlide + 1);
-    }, 4000);
-  }
-
-  function stopHomeAutoplay() {
-    if (homeAutoplayTimer) {
-      clearInterval(homeAutoplayTimer);
-      homeAutoplayTimer = null;
-    }
-  }
-
-  if (homeSliderNext) {
-    homeSliderNext.addEventListener('click', () => {
-      showHomeSlide(currentHomeSlide + 1);
-      startHomeAutoplay();
+  // Inicializar estado del primer slide
+  if (homeSlides.length) {
+    homeSlides.forEach((s, idx) => {
+      s.className = idx === 0 ? 'home-slide active' : 'home-slide';
     });
   }
+  startHomeAuto();
 
-  if (homeSliderPrev) {
-    homeSliderPrev.addEventListener('click', () => {
-      showHomeSlide(currentHomeSlide - 1);
-      startHomeAutoplay();
-    });
-  }
-
-  if (homeCarouselModule) {
-    homeCarouselModule.addEventListener('mouseenter', stopHomeAutoplay);
-    homeCarouselModule.addEventListener('mouseleave', startHomeAutoplay);
-  }
-
-  startHomeAutoplay();
-
-  /* ==========================================================================
-     4. ACCESO DIRECTO 2 (HOME): ESCULTURA 360 ANIMADA EN CANVAS
-     ========================================================================== */
+  /* ══════════════════════════════════════════════════════════════
+     4. HOME ACCESO 2: ESCULTURA 3D CON MATERIALIDAD MÁRMOL + METAL
+     ══════════════════════════════════════════════════════════════ */
   const homeCanvas = document.getElementById('homeSculptureCanvas');
   if (homeCanvas) {
     const ctx = homeCanvas.getContext('2d');
-    let homeAngle = 0;
-    let isDragging = false;
-    let lastX = 0;
+    let hAngle = 0, hDrag = false, hLastX = 0;
 
-    function drawHomeSculpture() {
-      const w = homeCanvas.width;
-      const h = homeCanvas.height;
-      ctx.clearRect(0, 0, w, h);
+    // Paleta de materialidad: mármol blanco + acero oscuro
+    function drawHomeSculptureMaterial() {
+      const W = homeCanvas.width, H = homeCanvas.height;
+      ctx.clearRect(0, 0, W, H);
+      const cx = W / 2, cy = H / 2 - 10;
 
-      const cx = w / 2;
-      const cy = h / 2 - 20;
-      const size = 130;
+      const t = performance.now() * 0.001;
+      const cosA = Math.cos(hAngle), sinA = Math.sin(hAngle);
+      const s = 120; // escala base
 
-      ctx.save();
-      ctx.translate(cx, cy);
-
-      // Rotación continua
-      const cosA = Math.cos(homeAngle);
-      const sinA = Math.sin(homeAngle);
-
-      // Definición de vértices de un prisma monolítico elegante
-      const vertices = [
-        { x: -0.6 * size * cosA, y: -size, z: -0.6 * size * sinA },
-        { x: 0.6 * size * cosA, y: -size, z: 0.6 * size * sinA },
-        { x: 0.9 * size * cosA, y: size, z: 0.9 * size * sinA },
-        { x: -0.9 * size * cosA, y: size, z: -0.9 * size * sinA },
-        { x: 0, y: -size * 1.35, z: 0 },
-        { x: 0, y: size * 1.15, z: 0 }
+      // Definir cara de una columna con torsión vertical (mármol)
+      // Vértices de un bloque prismático en el espacio 3D local
+      const verts3D = [
+        // base inferior (mármol)
+        { x: -s*0.55*cosA, y:  s*1.5, z: -s*0.55*sinA },
+        { x:  s*0.55*cosA, y:  s*1.5, z:  s*0.55*sinA },
+        { x:  s*0.65*cosA, y:  s*0.4, z:  s*0.65*sinA },
+        { x: -s*0.65*cosA, y:  s*0.4, z: -s*0.65*sinA },
+        // transición a metal (zona central)
+        { x: -s*0.45*cosA, y:  s*0.0, z: -s*0.45*sinA },
+        { x:  s*0.45*cosA, y:  s*0.0, z:  s*0.45*sinA },
+        { x:  s*0.52*cosA, y: -s*0.8, z:  s*0.52*sinA },
+        { x: -s*0.52*cosA, y: -s*0.8, z: -s*0.52*sinA },
+        // cima piramidal (metal pulido)
+        { x:  0,           y: -s*1.7, z:  0 }
       ];
 
-      // Proyección isométrica/perspectiva y sombreado monocromático
+      // Proyección 3D → 2D con perspectiva suave
+      const fov = 480;
+      const proj = verts3D.map(v => {
+        const x1 = v.x; const y1 = v.y;
+        const z1 = v.z + 300;
+        const sc = fov / z1;
+        return { px: cx + x1 * sc, py: cy + y1 * sc, depth: z1, sc };
+      });
+
+      // Definir caras con su material y vector de luz
+      const lightDir = { x: sinA * 0.7 + 0.3, y: -0.8 };
       const faces = [
-        { pts: [0, 1, 4], light: 0.85 + 0.3 * sinA },
-        { pts: [1, 2, 5], light: 0.55 - 0.2 * cosA },
-        { pts: [2, 3, 5], light: 0.35 + 0.3 * cosA },
-        { pts: [3, 0, 4], light: 0.7 - 0.25 * sinA },
-        { pts: [0, 1, 2, 3], light: 0.5 }
+        // Mármol (base) — más claro con venas
+        { pts: [0,1,2,3],     zone: 'marble', baseL: 0.75 + sinA * 0.2 },
+        // Zona de transición mármol→metal
+        { pts: [3,2,6,7],     zone: 'transition', baseL: 0.5 + cosA * 0.3 },
+        { pts: [2,5,6],       zone: 'transition', baseL: 0.55 - cosA * 0.2 },
+        // Metal (zona alta) — con reflejo especular
+        { pts: [4,5,6,7],     zone: 'metal', baseL: 0.35 + sinA * 0.4 },
+        { pts: [0,4,7,3],     zone: 'metal', baseL: 0.6 - sinA * 0.35 },
+        { pts: [1,5,4,0],     zone: 'metal', baseL: 0.4 + cosA * 0.35 },
+        // Cima piramidal metálica — alta reflectividad
+        { pts: [4,5,8],       zone: 'apex', baseL: 0.9 - sinA * 0.5 },
+        { pts: [5,6,8],       zone: 'apex', baseL: 0.6 + cosA * 0.4 },
+        { pts: [6,7,8],       zone: 'apex', baseL: 0.4 + sinA * 0.6 },
+        { pts: [7,4,8],       zone: 'apex', baseL: 0.75 - cosA * 0.4 },
       ];
 
-      faces.sort((a, b) => b.light - a.light);
+      // Ordenar por profundidad media
+      faces.forEach(f => {
+        f.avgDepth = f.pts.reduce((acc, i) => acc + (proj[i] ? proj[i].depth : 0), 0) / f.pts.length;
+      });
+      faces.sort((a, b) => b.avgDepth - a.avgDepth);
 
-      faces.forEach(face => {
+      faces.forEach(f => {
+        const pts = f.pts.map(i => proj[i]).filter(Boolean);
+        if (pts.length < 3) return;
+
         ctx.beginPath();
-        const first = vertices[face.pts[0]];
-        ctx.moveTo(first.x, first.y);
-        for (let i = 1; i < face.pts.length; i++) {
-          const pt = vertices[face.pts[i]];
-          ctx.lineTo(pt.x, pt.y);
-        }
+        ctx.moveTo(pts[0].px, pts[0].py);
+        for (let i = 1; i < pts.length; i++) ctx.lineTo(pts[i].px, pts[i].py);
         ctx.closePath();
 
-        const l = Math.min(255, Math.max(20, Math.floor(face.light * 200)));
-        ctx.fillStyle = `rgb(${l}, ${l}, ${l})`;
-        ctx.fill();
+        const l = Math.min(1, Math.max(0.05, f.baseL));
 
-        ctx.strokeStyle = 'rgba(255, 255, 255, 0.4)';
-        ctx.lineWidth = 1.2;
-        ctx.stroke();
+        if (f.zone === 'marble') {
+          // Mármol: blanco con gradiente y venas sutiles
+          const g = ctx.createLinearGradient(pts[0].px, pts[0].py, pts[2]?.px ?? pts[0].px, pts[2]?.py ?? pts[0].py);
+          const b1 = Math.floor(230 * l), b2 = Math.floor(180 * l);
+          g.addColorStop(0, `rgb(${b1},${b1},${b1})`);
+          g.addColorStop(0.45, `rgb(${b2},${b2},${b2})`);
+          g.addColorStop(1, `rgb(${b1},${b1},${b1})`);
+          ctx.fillStyle = g;
+          ctx.fill();
+          // Venas de mármol
+          ctx.strokeStyle = `rgba(255,255,255,${0.12 * l})`;
+          ctx.lineWidth = 0.8;
+          ctx.stroke();
+        } else if (f.zone === 'transition') {
+          const v = Math.floor(140 * l);
+          ctx.fillStyle = `rgb(${v},${v},${v})`;
+          ctx.fill();
+          ctx.strokeStyle = `rgba(255,255,255,0.2)`;
+          ctx.lineWidth = 0.6;
+          ctx.stroke();
+        } else if (f.zone === 'metal') {
+          // Metal: oscuro con reflejo especular brillante
+          const dark = Math.floor(60 * l);
+          const light = Math.floor(200 * l);
+          const g = ctx.createLinearGradient(pts[0].px, pts[0].py, pts[1]?.px ?? pts[0].px, pts[1]?.py ?? pts[0].py);
+          g.addColorStop(0, `rgb(${dark},${dark},${dark})`);
+          g.addColorStop(0.3 + sinA * 0.2, `rgb(${light},${light},${light})`);
+          g.addColorStop(1, `rgb(${Math.floor(dark*0.7)},${Math.floor(dark*0.7)},${Math.floor(dark*0.7)})`);
+          ctx.fillStyle = g;
+          ctx.fill();
+          ctx.strokeStyle = `rgba(255,255,255,${0.5 * l})`;
+          ctx.lineWidth = 1;
+          ctx.stroke();
+        } else {
+          // Cima apex: reflejo especular puro (blanco brillante animado)
+          const specular = Math.max(0, Math.min(1, f.baseL + Math.sin(t * 2) * 0.2));
+          const sv = Math.floor(255 * specular);
+          ctx.fillStyle = `rgb(${sv},${sv},${sv})`;
+          ctx.fill();
+          ctx.strokeStyle = `rgba(255,255,255,0.8)`;
+          ctx.lineWidth = 1.2;
+          ctx.stroke();
+        }
       });
 
-      // Anillo orbital luminoso sutil
-      ctx.beginPath();
-      ctx.ellipse(0, size * 0.95, size * 1.3, size * 0.35, 0, 0, Math.PI * 2);
-      ctx.strokeStyle = 'rgba(255, 255, 255, 0.18)';
-      ctx.setLineDash([4, 4]);
-      ctx.stroke();
-      ctx.setLineDash([]);
-
+      // Reflejo de la escultura en el suelo (mármol)
+      ctx.save();
+      ctx.globalAlpha = 0.18;
+      ctx.scale(1, -0.35);
+      ctx.translate(0, -(cy + s * 1.6) * 2 / 0.35);
+      faces.slice(-4).forEach(f => {
+        const pts = f.pts.map(i => proj[i]).filter(Boolean);
+        if (pts.length < 3) return;
+        ctx.beginPath();
+        ctx.moveTo(pts[0].px, pts[0].py);
+        for (let i = 1; i < pts.length; i++) ctx.lineTo(pts[i].px, pts[i].py);
+        ctx.closePath();
+        ctx.fillStyle = 'rgba(200,200,200,0.5)';
+        ctx.fill();
+      });
       ctx.restore();
 
-      if (!isDragging) {
-        homeAngle += 0.015;
-      }
-      requestAnimationFrame(drawHomeSculpture);
+      // Anillo orbital
+      ctx.save();
+      ctx.translate(cx, cy + s * 1.55);
+      ctx.beginPath();
+      ctx.ellipse(0, 0, s * 1.35, s * 0.28, 0, 0, Math.PI * 2);
+      ctx.strokeStyle = `rgba(255,255,255,${0.15 + 0.08 * Math.sin(t)})`;
+      ctx.setLineDash([3, 5]);
+      ctx.lineWidth = 1;
+      ctx.stroke();
+      ctx.setLineDash([]);
+      ctx.restore();
+
+      if (!hDrag) hAngle += 0.012;
+      requestAnimationFrame(drawHomeSculptureMaterial);
     }
+    drawHomeSculptureMaterial();
 
-    drawHomeSculpture();
-
-    // Permite interacción directa con el mouse también en el home
-    homeCanvas.addEventListener('mousedown', (e) => {
-      isDragging = true;
-      lastX = e.clientX;
-    });
-
-    window.addEventListener('mouseup', () => { isDragging = false; });
-    window.addEventListener('mousemove', (e) => {
-      if (!isDragging) return;
-      const dx = e.clientX - lastX;
-      lastX = e.clientX;
-      homeAngle += dx * 0.015;
-    });
-
-    // Touch para móviles
-    homeCanvas.addEventListener('touchstart', (e) => {
-      if (e.touches.length === 1) {
-        isDragging = true;
-        lastX = e.touches[0].clientX;
-      }
-    }, { passive: true });
-
-    window.addEventListener('touchmove', (e) => {
-      if (!isDragging || e.touches.length !== 1) return;
-      const dx = e.touches[0].clientX - lastX;
-      lastX = e.touches[0].clientX;
-      homeAngle += dx * 0.015;
-    }, { passive: true });
-
-    window.addEventListener('touchend', () => { isDragging = false; });
+    homeCanvas.addEventListener('mousedown', e => { hDrag = true; hLastX = e.clientX; homeCanvas.style.cursor = 'grabbing'; });
+    window.addEventListener('mouseup', () => { hDrag = false; homeCanvas.style.cursor = 'grab'; });
+    window.addEventListener('mousemove', e => { if (!hDrag) return; hAngle += (e.clientX - hLastX) * 0.013; hLastX = e.clientX; });
+    homeCanvas.addEventListener('touchstart', e => { if (e.touches.length === 1) { hDrag = true; hLastX = e.touches[0].clientX; } }, { passive: true });
+    window.addEventListener('touchmove', e => { if (!hDrag || e.touches.length !== 1) return; hAngle += (e.touches[0].clientX - hLastX) * 0.013; hLastX = e.touches[0].clientX; }, { passive: true });
+    window.addEventListener('touchend', () => hDrag = false);
   }
 
-  /* ==========================================================================
-     5. ACCESO DIRECTO 3 (HOME): OBRA INTERACTIVA CON DESTELLO SUTIL AL HOVER
-     ========================================================================== */
-  const glowWrapper = document.getElementById('glowCardWrapper');
-  const subtleFlare = document.getElementById('subtleFlare');
-  const interactiveCanvas = document.getElementById('interactiveCanvasOverlay');
-  const previewToneBtn = document.getElementById('previewToneBtn');
+  /* ══════════════════════════════════════════════════════════════
+     5. HOME ACCESO 3: OBRA INTERACTIVA CON DESTELLO Y PARTÍCULAS
+     ══════════════════════════════════════════════════════════════ */
+  const glowWrapper   = document.getElementById('glowCardWrapper');
+  const subtleFlare   = document.getElementById('subtleFlare');
+  const intCanvas     = document.getElementById('interactiveCanvasOverlay');
+  const previewTone   = document.getElementById('previewToneBtn');
+  let intActive = false;
 
   if (glowWrapper && subtleFlare) {
-    let flareRaf = null;
-
-    glowWrapper.addEventListener('mousemove', (e) => {
-      const rect = glowWrapper.getBoundingClientRect();
-      const x = ((e.clientX - rect.left) / rect.width) * 100;
-      const y = ((e.clientY - rect.top) / rect.height) * 100;
-
-      if (flareRaf) cancelAnimationFrame(flareRaf);
-      flareRaf = requestAnimationFrame(() => {
-        subtleFlare.style.setProperty('--glow-x', `${x}%`);
-        subtleFlare.style.setProperty('--glow-y', `${y}%`);
-      });
+    glowWrapper.addEventListener('mousemove', e => {
+      const r = glowWrapper.getBoundingClientRect();
+      subtleFlare.style.setProperty('--glow-x', `${((e.clientX - r.left) / r.width) * 100}%`);
+      subtleFlare.style.setProperty('--glow-y', `${((e.clientY - r.top) / r.height) * 100}%`);
     });
-
-    glowWrapper.addEventListener('mouseenter', () => {
-      // Al pasar el mouse, generar sutil destello de partículas
-      drawInteractiveField(true);
-    });
-
-    glowWrapper.addEventListener('mouseleave', () => {
-      drawInteractiveField(false);
-    });
+    glowWrapper.addEventListener('mouseenter', () => startInteractiveField());
+    glowWrapper.addEventListener('mouseleave', () => stopInteractiveField());
   }
 
-  // Efecto de filamentos lumínicos reactivos dentro del canvas overlay
-  let particlesActive = false;
-  function drawInteractiveField(activate) {
-    if (!interactiveCanvas) return;
-    particlesActive = activate;
-    if (!activate) return;
-
-    const ctx = interactiveCanvas.getContext('2d');
-    interactiveCanvas.width = interactiveCanvas.parentElement.clientWidth;
-    interactiveCanvas.height = interactiveCanvas.parentElement.clientHeight;
-
-    const particles = Array.from({ length: 28 }, () => ({
-      x: Math.random() * interactiveCanvas.width,
-      y: Math.random() * interactiveCanvas.height,
-      vx: (Math.random() - 0.5) * 1.2,
-      vy: (Math.random() - 0.5) * 1.2,
-      rad: Math.random() * 2 + 1,
-      alpha: Math.random() * 0.7 + 0.3
+  function startInteractiveField() {
+    if (intActive || !intCanvas) return;
+    intActive = true;
+    intCanvas.width = intCanvas.parentElement.clientWidth;
+    intCanvas.height = intCanvas.parentElement.clientHeight;
+    const ctx = intCanvas.getContext('2d');
+    const particles = Array.from({ length: 32 }, () => ({
+      x: Math.random() * intCanvas.width, y: Math.random() * intCanvas.height,
+      vx: (Math.random() - 0.5) * 1.4, vy: (Math.random() - 0.5) * 1.4,
+      r: Math.random() * 2 + 1, a: Math.random() * 0.7 + 0.3
     }));
-
-    function loop() {
-      if (!particlesActive) {
-        ctx.clearRect(0, 0, interactiveCanvas.width, interactiveCanvas.height);
-        return;
-      }
-      ctx.clearRect(0, 0, interactiveCanvas.width, interactiveCanvas.height);
-
-      // Dibujar filamentos
-      for (let i = 0; i < particles.length; i++) {
-        for (let j = i + 1; j < particles.length; j++) {
-          const dx = particles[i].x - particles[j].x;
-          const dy = particles[i].y - particles[j].y;
-          const dist = Math.sqrt(dx * dx + dy * dy);
-          if (dist < 90) {
-            ctx.strokeStyle = `rgba(255, 255, 255, ${0.2 * (1 - dist / 90)})`;
-            ctx.lineWidth = 0.8;
-            ctx.beginPath();
-            ctx.moveTo(particles[i].x, particles[i].y);
-            ctx.lineTo(particles[j].x, particles[j].y);
-            ctx.stroke();
-          }
-        }
-      }
-
-      particles.forEach(p => {
-        p.x += p.vx;
-        p.y += p.vy;
-        if (p.x < 0 || p.x > interactiveCanvas.width) p.vx *= -1;
-        if (p.y < 0 || p.y > interactiveCanvas.height) p.vy *= -1;
-
-        ctx.fillStyle = `rgba(255, 255, 255, ${p.alpha})`;
-        ctx.beginPath();
-        ctx.arc(p.x, p.y, p.rad, 0, Math.PI * 2);
-        ctx.fill();
+    (function loop() {
+      if (!intActive) { ctx.clearRect(0, 0, intCanvas.width, intCanvas.height); return; }
+      ctx.clearRect(0, 0, intCanvas.width, intCanvas.height);
+      particles.forEach((p, i) => {
+        particles.slice(i + 1).forEach(q => {
+          const d = Math.hypot(p.x - q.x, p.y - q.y);
+          if (d < 95) { ctx.strokeStyle = `rgba(255,255,255,${0.22 * (1 - d / 95)})`; ctx.lineWidth = 0.8; ctx.beginPath(); ctx.moveTo(p.x, p.y); ctx.lineTo(q.x, q.y); ctx.stroke(); }
+        });
+        p.x += p.vx; p.y += p.vy;
+        if (p.x < 0 || p.x > intCanvas.width) p.vx *= -1;
+        if (p.y < 0 || p.y > intCanvas.height) p.vy *= -1;
+        ctx.fillStyle = `rgba(255,255,255,${p.a})`; ctx.beginPath(); ctx.arc(p.x, p.y, p.r, 0, Math.PI * 2); ctx.fill();
       });
-
       requestAnimationFrame(loop);
-    }
-    loop();
+    })();
   }
+  function stopInteractiveField() { intActive = false; }
+  if (previewTone) previewTone.addEventListener('click', e => { e.stopPropagation(); galleryAudio.playGlintChime(440); showToast('Frecuencia: 440 Hz'); });
 
-  // Botón para probar sonido con destello acústico
-  if (previewToneBtn) {
-    previewToneBtn.addEventListener('click', (e) => {
-      e.stopPropagation();
-      galleryAudio.playGlintChime(440);
-      showToast('Frecuencia resonante: 440 Hz (La Natural)');
-    });
-  }
-
-  /* ==========================================================================
-     6. PÁGINA INTERNA 1: SECCIÓN PICS (CARRUSEL DINÁMICO & LIGHTBOX)
-     ========================================================================== */
-  const picsTrack = document.getElementById('picsTrack');
-  const picsItems = document.querySelectorAll('.carousel-item');
-  const picsPrevBtn = document.getElementById('picsPrevBtn');
-  const picsNextBtn = document.getElementById('picsNextBtn');
-  const picsCurrentDisplay = document.getElementById('picsCurrentDisplay');
-  const picsTotalDisplay = document.getElementById('picsTotalDisplay');
-  const picsProgressBar = document.getElementById('picsProgressBar');
+  /* ══════════════════════════════════════════════════════════════
+     6. SECCIÓN PICS: CARRUSEL DINÁMICO
+     ══════════════════════════════════════════════════════════════ */
+  const picsTrack    = document.getElementById('picsTrack');
+  const picsItems    = document.querySelectorAll('.carousel-item');
+  const picsPrevBtn  = document.getElementById('picsPrevBtn');
+  const picsNextBtn  = document.getElementById('picsNextBtn');
+  const picsProgress = document.getElementById('picsProgressBar');
   const picsThumbStrip = document.getElementById('picsThumbStrip');
   const picsAutoplayBtn = document.getElementById('picsAutoplayBtn');
-  const filterTabs = document.querySelectorAll('.filter-tab');
+  const filterTabs   = document.querySelectorAll('.filter-tab');
+  let curPics = 0, picsAutoplay = true, picsTimer = null;
+  let visiblePics = Array.from(picsItems);
 
-  let curPicsIndex = 0;
-  let picsAutoplay = true;
-  let picsTimer = null;
-  let visiblePicsItems = Array.from(picsItems);
-
-  // Inicializar Thumbnails en la barra inferior
-  function initThumbnails() {
+  function initThumbs() {
     if (!picsThumbStrip) return;
     picsThumbStrip.innerHTML = '';
-    visiblePicsItems.forEach((item, index) => {
+    visiblePics.forEach((item, i) => {
       const img = item.querySelector('img');
-      const thumb = document.createElement('div');
-      thumb.className = `thumb-item ${index === curPicsIndex ? 'active' : ''}`;
-      thumb.innerHTML = `<img src="${img.src}" alt="${img.alt}">`;
-      thumb.addEventListener('click', () => {
-        goToPicsSlide(index);
-        resetPicsAutoplay();
-      });
-      picsThumbStrip.appendChild(thumb);
+      const t = document.createElement('div');
+      t.className = `thumb-item ${i === curPics ? 'active' : ''}`;
+      t.innerHTML = `<img src="${img.src}" alt="">`;
+      t.addEventListener('click', () => { goToPics(i); resetAuto(); });
+      picsThumbStrip.appendChild(t);
     });
   }
-
   function updatePicsUI() {
-    if (!visiblePicsItems.length || !picsTrack) return;
-    const progressPercent = ((curPicsIndex + 1) / visiblePicsItems.length) * 100;
-    if (picsProgressBar) picsProgressBar.style.width = `${progressPercent}%`;
-
-    if (picsCurrentDisplay) {
-      picsCurrentDisplay.textContent = String(curPicsIndex + 1).padStart(2, '0');
-    }
-    if (picsTotalDisplay) {
-      picsTotalDisplay.textContent = String(visiblePicsItems.length).padStart(2, '0');
-    }
-
-    picsTrack.style.transform = `translateX(-${curPicsIndex * 100}%)`;
-
-    // Actualizar thumbnails activos
-    const thumbs = document.querySelectorAll('.thumb-item');
-    thumbs.forEach((th, i) => th.classList.toggle('active', i === curPicsIndex));
+    if (!visiblePics.length || !picsTrack) return;
+    if (picsProgress) picsProgress.style.width = `${((curPics + 1) / visiblePics.length) * 100}%`;
+    const cur = document.getElementById('picsCurrentDisplay'), tot = document.getElementById('picsTotalDisplay');
+    if (cur) cur.textContent = String(curPics + 1).padStart(2, '0');
+    if (tot) tot.textContent = String(visiblePics.length).padStart(2, '0');
+    picsTrack.style.transform = `translateX(-${curPics * 100}%)`;
+    document.querySelectorAll('.thumb-item').forEach((t, i) => t.classList.toggle('active', i === curPics));
   }
+  function goToPics(i) { curPics = ((i % visiblePics.length) + visiblePics.length) % visiblePics.length; updatePicsUI(); }
+  function resetAuto() { clearInterval(picsTimer); if (picsAutoplay && visiblePics.length > 1) picsTimer = setInterval(() => goToPics(curPics + 1), 5000); }
 
-  function goToPicsSlide(index) {
-    if (index >= visiblePicsItems.length) index = 0;
-    if (index < 0) index = visiblePicsItems.length - 1;
-    curPicsIndex = index;
-    updatePicsUI();
-  }
-
-  function resetPicsAutoplay() {
-    if (picsTimer) clearInterval(picsTimer);
-    if (picsAutoplay && visiblePicsItems.length > 1) {
-      picsTimer = setInterval(() => {
-        goToPicsSlide(curPicsIndex + 1);
-      }, 5000);
-    }
-  }
-
-  if (picsNextBtn) {
-    picsNextBtn.addEventListener('click', () => {
-      goToPicsSlide(curPicsIndex + 1);
-      resetPicsAutoplay();
-    });
-  }
-
-  if (picsPrevBtn) {
-    picsPrevBtn.addEventListener('click', () => {
-      goToPicsSlide(curPicsIndex - 1);
-      resetPicsAutoplay();
-    });
-  }
-
-  if (picsAutoplayBtn) {
-    picsAutoplayBtn.addEventListener('click', () => {
-      picsAutoplay = !picsAutoplay;
-      picsAutoplayBtn.classList.toggle('active', picsAutoplay);
-      const symbol = picsAutoplayBtn.querySelector('.status-symbol');
-      if (symbol) symbol.textContent = picsAutoplay ? '❚❚' : '▶';
-      resetPicsAutoplay();
-    });
-  }
-
-  // Filtros de categoría de fotografía
-  filterTabs.forEach(tab => {
-    tab.addEventListener('click', () => {
-      filterTabs.forEach(t => t.classList.remove('active'));
-      tab.classList.add('active');
-
-      const filter = tab.getAttribute('data-filter');
-      picsItems.forEach(item => {
-        if (filter === 'all' || item.getAttribute('data-category') === filter) {
-          item.style.display = 'block';
-        } else {
-          item.style.display = 'none';
-        }
-      });
-
-      visiblePicsItems = Array.from(picsItems).filter(item => item.style.display !== 'none');
-      curPicsIndex = 0;
-      initThumbnails();
-      updatePicsUI();
-      resetPicsAutoplay();
-    });
+  if (picsNextBtn) picsNextBtn.addEventListener('click', () => { goToPics(curPics + 1); resetAuto(); });
+  if (picsPrevBtn) picsPrevBtn.addEventListener('click', () => { goToPics(curPics - 1); resetAuto(); });
+  if (picsAutoplayBtn) picsAutoplayBtn.addEventListener('click', () => {
+    picsAutoplay = !picsAutoplay;
+    picsAutoplayBtn.classList.toggle('active', picsAutoplay);
+    const sym = picsAutoplayBtn.querySelector('.status-symbol');
+    if (sym) sym.textContent = picsAutoplay ? '❚❚' : '▶';
+    resetAuto();
   });
+  filterTabs.forEach(tab => tab.addEventListener('click', () => {
+    filterTabs.forEach(t => t.classList.remove('active'));
+    tab.classList.add('active');
+    const f = tab.dataset.filter;
+    picsItems.forEach(item => item.style.display = (f === 'all' || item.dataset.category === f) ? 'block' : 'none');
+    visiblePics = Array.from(picsItems).filter(item => item.style.display !== 'none');
+    curPics = 0; initThumbs(); updatePicsUI(); resetAuto();
+  }));
+  initThumbs(); updatePicsUI(); resetAuto();
 
-  initThumbnails();
-  updatePicsUI();
-  resetPicsAutoplay();
-
-  /* ==========================================================================
-     7. MODAL LIGHTBOX PARA INSPECCIÓN DE FOTOGRAFÍAS
-     ========================================================================== */
-  const lightboxModal = document.getElementById('lightboxModal');
-  const lightboxBackdrop = document.getElementById('lightboxBackdrop');
-  const lightboxCloseBtn = document.getElementById('lightboxCloseBtn');
-  const lightboxImg = document.getElementById('lightboxImg');
-  const lightboxTitle = document.getElementById('lightboxTitle');
-  const lightboxArtist = document.getElementById('lightboxArtist');
-  const lightboxCategory = document.getElementById('lightboxCategory');
-  const lightboxYear = document.getElementById('lightboxYear');
-  const lightboxCamera = document.getElementById('lightboxCamera');
-  const lightboxPrevBtn = document.getElementById('lightboxPrevBtn');
-  const lightboxNextBtn = document.getElementById('lightboxNextBtn');
+  /* ══════════════════════════════════════════════════════════════
+     7. LIGHTBOX MODAL
+     ══════════════════════════════════════════════════════════════ */
+  const lightbox   = document.getElementById('lightboxModal');
+  const lbBackdrop = document.getElementById('lightboxBackdrop');
+  const lbClose    = document.getElementById('lightboxCloseBtn');
+  const lbImg      = document.getElementById('lightboxImg');
 
   function openLightbox(item) {
-    if (!lightboxModal || !item) return;
+    if (!lightbox || !item) return;
     const img = item.querySelector('img');
-    if (lightboxImg) lightboxImg.src = img.src;
-    if (lightboxTitle) lightboxTitle.textContent = item.getAttribute('data-title') || 'Obra Fotográfica';
-    if (lightboxArtist) lightboxArtist.textContent = item.getAttribute('data-artist') || 'Artista';
-    if (lightboxCategory) lightboxCategory.textContent = (item.getAttribute('data-category') || 'FOTOGRAFÍA').toUpperCase();
-    if (lightboxYear) lightboxYear.textContent = item.getAttribute('data-year') || '2024';
-    if (lightboxCamera) lightboxCamera.textContent = item.getAttribute('data-camera') || 'Formato Medio';
-
-    lightboxModal.classList.add('active');
+    if (lbImg) lbImg.src = img.src;
+    ['lightboxTitle','lightboxArtist','lightboxCategory','lightboxYear','lightboxCamera'].forEach(id => {
+      const el = document.getElementById(id);
+      if (!el) return;
+      const map = { lightboxTitle: 'data-title', lightboxArtist: 'data-artist', lightboxCategory: 'data-category', lightboxYear: 'data-year', lightboxCamera: 'data-camera' };
+      el.textContent = item.getAttribute(map[id]) || '';
+    });
+    lightbox.classList.add('active');
     document.body.style.overflow = 'hidden';
   }
+  function closeLightbox() { if (!lightbox) return; lightbox.classList.remove('active'); document.body.style.overflow = ''; }
 
-  function closeLightbox() {
-    if (!lightboxModal) return;
-    lightboxModal.classList.remove('active');
-    document.body.style.overflow = '';
-  }
-
-  // Asignar clic de inspección a cada tarjeta de fotografía
-  picsItems.forEach((item, index) => {
+  picsItems.forEach((item, i) => {
     const btn = item.querySelector('.btn-inspect');
-    if (btn) {
-      btn.addEventListener('click', (e) => {
-        e.stopPropagation();
-        curPicsIndex = index;
-        openLightbox(item);
-      });
-    }
+    if (btn) btn.addEventListener('click', e => { e.stopPropagation(); curPics = i; openLightbox(item); });
     const card = item.querySelector('.carousel-card');
-    if (card) {
-      card.addEventListener('click', () => {
-        curPicsIndex = index;
-        openLightbox(item);
-      });
-    }
+    if (card) card.addEventListener('click', () => { curPics = i; openLightbox(item); });
   });
-
-  if (lightboxCloseBtn) lightboxCloseBtn.addEventListener('click', closeLightbox);
-  if (lightboxBackdrop) lightboxBackdrop.addEventListener('click', closeLightbox);
-  window.addEventListener('keydown', (e) => {
+  if (lbClose) lbClose.addEventListener('click', closeLightbox);
+  if (lbBackdrop) lbBackdrop.addEventListener('click', closeLightbox);
+  window.addEventListener('keydown', e => {
     if (e.key === 'Escape') closeLightbox();
-    if (lightboxModal && lightboxModal.classList.contains('active')) {
-      if (e.key === 'ArrowRight') {
-        goToPicsSlide(curPicsIndex + 1);
-        openLightbox(visiblePicsItems[curPicsIndex]);
-      } else if (e.key === 'ArrowLeft') {
-        goToPicsSlide(curPicsIndex - 1);
-        openLightbox(visiblePicsItems[curPicsIndex]);
-      }
+    if (lightbox?.classList.contains('active')) {
+      if (e.key === 'ArrowRight') { goToPics(curPics + 1); openLightbox(visiblePics[curPics]); }
+      if (e.key === 'ArrowLeft')  { goToPics(curPics - 1); openLightbox(visiblePics[curPics]); }
     }
   });
+  const lbPrev = document.getElementById('lightboxPrevBtn'), lbNext = document.getElementById('lightboxNextBtn');
+  if (lbPrev) lbPrev.addEventListener('click', () => { goToPics(curPics - 1); openLightbox(visiblePics[curPics]); });
+  if (lbNext) lbNext.addEventListener('click', () => { goToPics(curPics + 1); openLightbox(visiblePics[curPics]); });
 
-  if (lightboxPrevBtn) {
-    lightboxPrevBtn.addEventListener('click', () => {
-      goToPicsSlide(curPicsIndex - 1);
-      openLightbox(visiblePicsItems[curPicsIndex]);
-    });
-  }
-
-  if (lightboxNextBtn) {
-    lightboxNextBtn.addEventListener('click', () => {
-      goToPicsSlide(curPicsIndex + 1);
-      openLightbox(visiblePicsItems[curPicsIndex]);
-    });
-  }
-
-  /* ==========================================================================
-     8. PÁGINA INTERNA 2: SECCIÓN 360 (ROTACIÓN SOBRE PUNTO FIJO)
-     ========================================================================== */
-  const canvas360 = document.getElementById('canvas360');
-  const angleDegree = document.getElementById('angleDegree');
-  const toggle360AutoBtn = document.getElementById('toggle360AutoBtn');
-  const autoRotateIcon = document.getElementById('autoRotateIcon');
-  const reset360Btn = document.getElementById('reset360Btn');
-  const speedSlider = document.getElementById('speedSlider');
-  const wireframeToggleBtn = document.getElementById('wireframeToggleBtn');
+  /* ══════════════════════════════════════════════════════════════
+     8. SECCIÓN 360°: MONOLITO DE CRISTAL CON REFLEJOS PRISMÁTICOS
+     ══════════════════════════════════════════════════════════════ */
+  const canvas360    = document.getElementById('canvas360');
+  const angleDegree  = document.getElementById('angleDegree');
   const sculptureTabs = document.querySelectorAll('.sculpture-tab-btn');
   const sculptureNameLabel = document.getElementById('sculptureNameLabel');
+  const toggle360AutoBtn   = document.getElementById('toggle360AutoBtn');
+  const autoRotateIcon     = document.getElementById('autoRotateIcon');
+  const reset360Btn        = document.getElementById('reset360Btn');
+  const speedSlider        = document.getElementById('speedSlider');
+  const wireframeToggleBtn = document.getElementById('wireframeToggleBtn');
 
   if (canvas360) {
     const ctx = canvas360.getContext('2d');
-    let currentModel = 'monolith';
-    let angleY = 0;
-    let angleX = 0.15; // Ligera inclinación para perspectiva tridimensional
-    let autoRotate = true;
-    let rotateSpeed = 1;
-    let wireframeMode = false;
-    let isDragging360 = false;
-    let startX = 0, startY = 0;
-    let velocityX = 0;
+    let cModel = 'monolith', angleY = 0, angleX = 0.18;
+    let autoRot = true, rotSpd = 1, wireframe = false;
+    let drag360 = false, s360X = 0, s360Y = 0, vel360 = 0;
 
-    // Generador de geometrías según el modelo elegido
-    function getModelGeometry(type) {
+    // ── Geometrías ──────────────────────────────────────────────
+    function getGeom(type) {
       if (type === 'prism') {
-        // Prisma fractal torsonado
-        const height = 180;
-        const radius = 90;
-        const levels = 6;
-        const vertices = [];
-        const edges = [];
-
-        for (let i = 0; i <= levels; i++) {
-          const y = -height / 2 + (i / levels) * height;
-          const twist = (i / levels) * Math.PI;
-          const r = radius * (1 - 0.25 * Math.sin((i / levels) * Math.PI));
-          for (let j = 0; j < 4; j++) {
-            const th = twist + (j * Math.PI) / 2;
-            vertices.push({ x: r * Math.cos(th), y: y, z: r * Math.sin(th) });
-          }
+        const H = 180, R = 90, L = 6;
+        const verts = [], edges = [];
+        for (let i = 0; i <= L; i++) {
+          const y = -H/2 + (i/L)*H, twist = (i/L)*Math.PI;
+          const r = R * (1 - 0.25 * Math.sin((i/L)*Math.PI));
+          for (let j = 0; j < 4; j++) { const th = twist + j*Math.PI/2; verts.push({ x: r*Math.cos(th), y, z: r*Math.sin(th) }); }
         }
-
-        for (let i = 0; i < levels; i++) {
-          const base = i * 4;
-          const next = (i + 1) * 4;
-          for (let j = 0; j < 4; j++) {
-            const jNext = (j + 1) % 4;
-            edges.push([base + j, base + jNext]);
-            edges.push([base + j, next + j]);
-            edges.push([base + j, next + jNext]);
-          }
+        for (let i = 0; i < L; i++) {
+          const b = i*4, n = (i+1)*4;
+          for (let j = 0; j < 4; j++) { const jn = (j+1)%4; edges.push([b+j,b+jn],[b+j,n+j],[b+j,n+jn]); }
         }
-        return { vertices, edges, isMesh: true };
-      } else if (type === 'sphere') {
-        // Esfera geodésica / icosaedro subdividido
-        const t = (1.0 + Math.sqrt(5.0)) / 2.0;
-        const r = 100;
-        let v = [
-          [-1, t, 0], [1, t, 0], [-1, -t, 0], [1, -t, 0],
-          [0, -1, t], [0, 1, t], [0, -1, -t], [0, 1, -t],
-          [t, 0, -1], [t, 0, 1], [-t, 0, -1], [-t, 0, 1]
-        ].map(pt => {
-          const len = Math.sqrt(pt[0]*pt[0] + pt[1]*pt[1] + pt[2]*pt[2]);
-          return { x: (pt[0]/len)*r, y: (pt[1]/len)*r, z: (pt[2]/len)*r };
-        });
-
-        const edges = [
-          [0,11],[0,5],[0,1],[0,7],[0,10],[1,5],[5,11],[11,10],[10,7],[7,1],
-          [3,9],[3,4],[3,2],[3,6],[3,8],[4,9],[9,8],[8,6],[6,2],[2,4],
-          [5,9],[5,4],[11,4],[11,2],[10,2],[10,6],[7,6],[7,8],[1,8],[1,9]
-        ];
-        return { vertices: v, edges, isMesh: true };
-      } else {
-        // Monolito Obsidiana (Facetas piramidales y aristas agudas)
-        const s = 100;
-        const vertices = [
-          { x: -s*0.5, y: -s*1.2, z: -s*0.5 },
-          { x: s*0.5, y: -s*1.2, z: -s*0.5 },
-          { x: s*0.6, y: -s*0.3, z: s*0.6 },
-          { x: -s*0.6, y: -s*0.3, z: s*0.6 },
-          { x: -s*0.8, y: s*1.3, z: -s*0.8 },
-          { x: s*0.8, y: s*1.3, z: -s*0.8 },
-          { x: s*0.9, y: s*1.5, z: s*0.9 },
-          { x: -s*0.9, y: s*1.5, z: s*0.9 },
-          { x: 0, y: -s*1.7, z: 0 }, // Cúspide
-          { x: 0, y: s*1.6, z: 0 }    // Base
-        ];
-
-        const edges = [
-          [8,0],[8,1],[8,2],[8,3],
-          [0,1],[1,2],[2,3],[3,0],
-          [0,4],[1,5],[2,6],[3,7],
-          [4,5],[5,6],[6,7],[7,4],
-          [9,4],[9,5],[9,6],[9,7]
-        ];
-
-        const faces = [
-          [8, 0, 1], [8, 1, 2], [8, 2, 3], [8, 3, 0],
-          [0, 1, 5, 4], [1, 2, 6, 5], [2, 3, 7, 6], [3, 0, 4, 7],
-          [9, 4, 5], [9, 5, 6], [9, 6, 7], [9, 7, 4]
-        ];
-
-        return { vertices, edges, faces, isMesh: false };
+        return { verts, edges, faces: null, material: 'metal' };
       }
+      if (type === 'sphere') {
+        const t2 = (1+Math.sqrt(5))/2, R = 100;
+        const rawV = [[-1,t2,0],[1,t2,0],[-1,-t2,0],[1,-t2,0],[0,-1,t2],[0,1,t2],[0,-1,-t2],[0,1,-t2],[t2,0,-1],[t2,0,1],[-t2,0,-1],[-t2,0,1]];
+        const verts = rawV.map(p => { const len=Math.hypot(...p); return {x:(p[0]/len)*R,y:(p[1]/len)*R,z:(p[2]/len)*R}; });
+        const edges = [[0,11],[0,5],[0,1],[0,7],[0,10],[1,5],[5,11],[11,10],[10,7],[7,1],[3,9],[3,4],[3,2],[3,6],[3,8],[4,9],[9,8],[8,6],[6,2],[2,4],[5,9],[5,4],[11,4],[11,2],[10,2],[10,6],[7,6],[7,8],[1,8],[1,9]];
+        return { verts, edges, faces: null, material: 'marble' };
+      }
+      // MONOLITO DE CRISTAL — geometría de prisma hexagonal afilado
+      const s = 95;
+      const verts = [
+        // BASE HEXAGONAL (6 puntos)
+        { x:  s*0.5,  y:  s*1.6,  z:  0        },
+        { x:  s*0.25, y:  s*1.6,  z:  s*0.43   },
+        { x: -s*0.25, y:  s*1.6,  z:  s*0.43   },
+        { x: -s*0.5,  y:  s*1.6,  z:  0        },
+        { x: -s*0.25, y:  s*1.6,  z: -s*0.43   },
+        { x:  s*0.25, y:  s*1.6,  z: -s*0.43   },
+        // CINTURA MEDIA más estrecha
+        { x:  s*0.35, y:  0,      z:  0        },
+        { x:  s*0.175,y:  0,      z:  s*0.3    },
+        { x: -s*0.175,y:  0,      z:  s*0.3    },
+        { x: -s*0.35, y:  0,      z:  0        },
+        { x: -s*0.175,y:  0,      z: -s*0.3    },
+        { x:  s*0.175,y:  0,      z: -s*0.3    },
+        // CÚSPIDE
+        { x:  0,      y: -s*1.75, z:  0        }
+      ];
+      const faces = [
+        // Caras laterales hexagonales base → cintura
+        [0,1,7,6], [1,2,8,7], [2,3,9,8], [3,4,10,9], [4,5,11,10], [5,0,6,11],
+        // Caras laterales cintura → cúspide
+        [6,7,12], [7,8,12], [8,9,12], [9,10,12], [10,11,12], [11,6,12],
+        // Tapa base (hexágono)
+        [0,1,2,3,4,5]
+      ];
+      const edges = [[0,1],[1,2],[2,3],[3,4],[4,5],[5,0],[6,7],[7,8],[8,9],[9,10],[10,11],[11,6],[0,6],[1,7],[2,8],[3,9],[4,10],[5,11],[6,12],[7,12],[8,12],[9,12],[10,12],[11,12]];
+      return { verts, edges, faces, material: 'crystal' };
     }
 
+    // ── Renderer 360 ─────────────────────────────────────────────
     function render360() {
-      const w = canvas360.width;
-      const h = canvas360.height;
-      ctx.clearRect(0, 0, w, h);
+      const W = canvas360.width, H = canvas360.height;
+      ctx.clearRect(0, 0, W, H);
+      const cx = W/2, cy = H/2 - 10;
+      const geom = getGeom(cModel);
+      const t = performance.now() * 0.001;
+      const cosY = Math.cos(angleY), sinY = Math.sin(angleY);
+      const cosX = Math.cos(angleX), sinX = Math.sin(angleX);
 
-      const cx = w / 2;
-      const cy = h / 2 - 10;
-      const geom = getModelGeometry(currentModel);
-
-      // Rotaciones 3D
-      const cosY = Math.cos(angleY);
-      const sinY = Math.sin(angleY);
-      const cosX = Math.cos(angleX);
-      const sinX = Math.sin(angleX);
-
-      const projVertices = geom.vertices.map(v => {
-        // Rotar sobre eje Y (rotación horizontal alrededor de sí misma)
-        const x1 = v.x * cosY + v.z * sinY;
-        const z1 = -v.x * sinY + v.z * cosY;
-        // Rotar sobre eje X (inclinación perspectiva)
-        const y2 = v.y * cosX - z1 * sinX;
-        const z2 = v.y * sinX + z1 * cosX;
-
-        // Perspectiva de cámara
-        const fov = 500;
-        const scale = fov / (fov + z2 + 250);
-        return {
-          x: cx + x1 * scale,
-          y: cy + y2 * scale,
-          z: z2,
-          scale: scale
-        };
+      // Proyectar vértices
+      const proj = geom.verts.map(v => {
+        const x1 = v.x*cosY + v.z*sinY, z1 = -v.x*sinY + v.z*cosY;
+        const y2 = v.y*cosX - z1*sinX,  z2 = v.y*sinX + z1*cosX;
+        if (z2 <= -240) return null;
+        const sc = 500 / (z2 + 260);
+        return { x: cx + x1*sc, y: cy + y2*sc, z: z2, sc };
       });
 
-      // Renderizado según modo (Wireframe o Sólido Shaded)
-      if (geom.faces && !wireframeMode) {
-        // Ordenar facetas por profundidad z (Painter's algorithm)
-        const sortedFaces = geom.faces.map(indices => {
-          let avgZ = 0;
-          indices.forEach(idx => { avgZ += projVertices[idx].z; });
-          avgZ /= indices.length;
+      if (geom.faces && !wireframe) {
+        // Painter's algorithm con materialidad de cristal
+        const sorted = geom.faces.map(idxs => {
+          const pts = idxs.map(i => proj[i]).filter(Boolean);
+          if (pts.length < 3) return null;
+          const avgZ = pts.reduce((a, p) => a + p.z, 0) / pts.length;
+          const p0 = pts[0], p1 = pts[1], p2 = pts[2];
+          const normal = (p1.x-p0.x)*(p2.y-p0.y) - (p1.y-p0.y)*(p2.x-p0.x);
+          return { pts, avgZ, normal, idxs };
+        }).filter(Boolean).sort((a, b) => b.avgZ - a.avgZ);
 
-          // Vector normal aproximado para iluminación dinámica
-          const p0 = projVertices[indices[0]];
-          const p1 = projVertices[indices[1]];
-          const p2 = projVertices[indices[2]];
-          const vax = p1.x - p0.x, vay = p1.y - p0.y;
-          const vbx = p2.x - p0.x, vby = p2.y - p0.y;
-          const cross = vax * vby - vay * vbx;
+        sorted.forEach(face => {
+          ctx.beginPath();
+          ctx.moveTo(face.pts[0].x, face.pts[0].y);
+          for (let i = 1; i < face.pts.length; i++) ctx.lineTo(face.pts[i].x, face.pts[i].y);
+          ctx.closePath();
 
-          return { indices, z: avgZ, normal: cross };
-        }).sort((a, b) => b.z - a.z);
+          if (geom.material === 'crystal') {
+            // CRISTAL: capas de reflejos internos prismáticos
+            const depthFactor = Math.min(1, Math.max(0, (face.avgZ + 200) / 400));
+            const refractShift = Math.sin(angleY * 2 + t) * 0.3;
+            const n = face.normal;
 
-        sortedFaces.forEach(f => {
-          if (f.normal > -100) { // Culling de facetas traseras
-            ctx.beginPath();
-            ctx.moveTo(projVertices[f.indices[0]].x, projVertices[f.indices[0]].y);
-            for (let i = 1; i < f.indices.length; i++) {
-              ctx.lineTo(projVertices[f.indices[i]].x, projVertices[f.indices[i]].y);
+            if (n > 0) {
+              // Cara frontal: transparencia con reflejo de luz
+              const lightAngle = Math.sin(angleY + Math.PI / 4);
+              const specular = Math.max(0, lightAngle);
+              const baseAlpha = 0.25 + depthFactor * 0.35;
+              const refractR = Math.floor(180 * (0.5 + refractShift * 0.5));
+              const refractG = Math.floor(200 * (0.6 + refractShift * 0.3));
+              const refractB = Math.floor(240 * (0.8 - refractShift * 0.2));
+
+              // Gradiente prismático (verde-azul-blanco según ángulo de refracción)
+              const gx = ctx.createLinearGradient(face.pts[0].x, face.pts[0].y, face.pts[face.pts.length-1].x, face.pts[face.pts.length-1].y);
+              gx.addColorStop(0,   `rgba(${refractR},${refractG},${refractB},${baseAlpha})`);
+              gx.addColorStop(0.4 + refractShift*0.2, `rgba(255,255,255,${baseAlpha * 0.9 + specular * 0.6})`);
+              gx.addColorStop(1,   `rgba(${refractR*0.6},${refractG*0.7},${refractB},${baseAlpha * 0.6})`);
+              ctx.fillStyle = gx;
+              ctx.fill();
+
+              // Arista brillante de cristal
+              ctx.strokeStyle = `rgba(255,255,255,${0.6 + specular * 0.4})`;
+              ctx.lineWidth = 1.5;
+              ctx.stroke();
+
+              // Rayo interno de luz refractada (caustica)
+              if (specular > 0.5) {
+                const rayX = (face.pts[0].x + face.pts[face.pts.length-1].x) / 2;
+                const rayY = (face.pts[0].y + face.pts[face.pts.length-1].y) / 2;
+                const rayGrad = ctx.createRadialGradient(rayX, rayY, 0, rayX, rayY, 60 * face.pts[0].sc);
+                rayGrad.addColorStop(0, `rgba(255,255,255,${(specular - 0.5) * 0.8})`);
+                rayGrad.addColorStop(1, 'rgba(255,255,255,0)');
+                ctx.fillStyle = rayGrad;
+                ctx.fill();
+              }
+            } else {
+              // Cara trasera: muy oscura semitransparente (profundidad del cristal)
+              ctx.fillStyle = `rgba(10,10,20,${0.4 + depthFactor * 0.3})`;
+              ctx.fill();
+              ctx.strokeStyle = 'rgba(150,180,255,0.15)';
+              ctx.lineWidth = 0.7;
+              ctx.stroke();
             }
-            ctx.closePath();
 
-            // Iluminación monocromática pulida de galería
-            const lightIntensity = Math.min(240, Math.max(25, Math.floor(120 + f.normal * 0.015)));
-            ctx.fillStyle = `rgb(${lightIntensity}, ${lightIntensity}, ${lightIntensity})`;
+          } else if (geom.material === 'marble') {
+            const l = Math.max(0.15, Math.min(0.9, (face.normal * 0.003 + 0.55)));
+            const v = Math.floor(l * 220);
+            ctx.fillStyle = `rgb(${v},${v},${v})`;
             ctx.fill();
-
-            ctx.strokeStyle = 'rgba(255, 255, 255, 0.35)';
-            ctx.lineWidth = 1;
+            ctx.strokeStyle = 'rgba(255,255,255,0.3)';
+            ctx.lineWidth = 0.8;
+            ctx.stroke();
+          } else {
+            const l = Math.max(0.1, Math.min(0.95, (face.normal * 0.002 + 0.5)));
+            const dark = Math.floor(l * 60), bright = Math.floor(l * 220);
+            const g = ctx.createLinearGradient(face.pts[0].x, face.pts[0].y, face.pts[1]?.x ?? face.pts[0].x, face.pts[1]?.y ?? face.pts[0].y);
+            g.addColorStop(0, `rgb(${dark},${dark},${dark})`);
+            g.addColorStop(0.5, `rgb(${bright},${bright},${bright})`);
+            g.addColorStop(1, `rgb(${dark},${dark},${dark})`);
+            ctx.fillStyle = g;
+            ctx.fill();
+            ctx.strokeStyle = `rgba(255,255,255,${0.4 * l})`;
+            ctx.lineWidth = 0.9;
             ctx.stroke();
           }
         });
+
+        // Destellos de caustica en el piso (solo para cristal)
+        if (geom.material === 'crystal') {
+          const causticY = cy + 170;
+          for (let i = 0; i < 5; i++) {
+            const cx2 = cx + Math.sin(angleY + i * 1.3) * 80;
+            const size = 20 + Math.sin(t * 1.5 + i) * 8;
+            const cg = ctx.createRadialGradient(cx2, causticY, 0, cx2, causticY, size);
+            cg.addColorStop(0, `rgba(200,220,255,${0.18 + Math.sin(t + i) * 0.08})`);
+            cg.addColorStop(1, 'rgba(200,220,255,0)');
+            ctx.fillStyle = cg;
+            ctx.beginPath();
+            ctx.ellipse(cx2, causticY, size, size * 0.3, 0, 0, Math.PI * 2);
+            ctx.fill();
+          }
+        }
+
       } else {
-        // Modo Wireframe estructurado
-        ctx.strokeStyle = 'rgba(255, 255, 255, 0.75)';
+        // MODO WIREFRAME
+        ctx.strokeStyle = geom.material === 'crystal' ? 'rgba(180,220,255,0.85)' : 'rgba(255,255,255,0.75)';
         ctx.lineWidth = 1.2;
-        geom.edges.forEach(edge => {
-          const p1 = projVertices[edge[0]];
-          const p2 = projVertices[edge[1]];
-          ctx.beginPath();
-          ctx.moveTo(p1.x, p1.y);
-          ctx.lineTo(p2.x, p2.y);
-          ctx.stroke();
+        geom.edges.forEach(([a, b]) => {
+          const p1 = proj[a], p2 = proj[b];
+          if (!p1 || !p2) return;
+          ctx.beginPath(); ctx.moveTo(p1.x, p1.y); ctx.lineTo(p2.x, p2.y); ctx.stroke();
         });
-
-        // Nodos luminosos en los vértices
-        projVertices.forEach(pt => {
-          ctx.fillStyle = '#ffffff';
-          ctx.beginPath();
-          ctx.arc(pt.x, pt.y, 2.5 * pt.scale, 0, Math.PI * 2);
-          ctx.fill();
-        });
+        proj.forEach(p => { if (!p) return; ctx.fillStyle = '#fff'; ctx.beginPath(); ctx.arc(p.x, p.y, 2.2*p.sc, 0, Math.PI*2); ctx.fill(); });
       }
 
-      // Actualizar HUD de grados de ángulo
-      if (angleDegree) {
-        let deg = Math.round(((angleY % (Math.PI * 2) + Math.PI * 2) % (Math.PI * 2)) * (180 / Math.PI));
-        angleDegree.textContent = `${deg}°`;
-      }
+      // HUD de ángulo
+      if (angleDegree) angleDegree.textContent = `${Math.round(((angleY%(Math.PI*2)+Math.PI*2)%(Math.PI*2))*(180/Math.PI))}°`;
 
-      // Física de inercia y auto-rotación continua
-      if (autoRotate && !isDragging360) {
-        angleY += 0.008 * rotateSpeed;
-      } else if (!isDragging360 && Math.abs(velocityX) > 0.0001) {
-        angleY += velocityX;
-        velocityX *= 0.94; // Fricción de desaceleración
-      }
-
+      // Física de rotación
+      if (autoRot && !drag360) angleY += 0.008 * rotSpd;
+      else if (!drag360 && Math.abs(vel360) > 0.0001) { angleY += vel360; vel360 *= 0.93; }
       requestAnimationFrame(render360);
     }
-
     render360();
 
-    // Eventos de arrastre con mouse sobre el canvas 360
-    canvas360.addEventListener('mousedown', (e) => {
-      isDragging360 = true;
-      startX = e.clientX;
-      startY = e.clientY;
-      velocityX = 0;
+    // Eventos drag
+    canvas360.addEventListener('mousedown', e => { drag360 = true; s360X = e.clientX; s360Y = e.clientY; vel360 = 0; });
+    window.addEventListener('mouseup', () => drag360 = false);
+    window.addEventListener('mousemove', e => {
+      if (!drag360) return;
+      const dx = e.clientX - s360X, dy = e.clientY - s360Y;
+      s360X = e.clientX; s360Y = e.clientY;
+      vel360 = dx * 0.008; angleY += vel360;
+      angleX = Math.max(-0.45, Math.min(0.45, angleX + dy * 0.004));
     });
+    canvas360.addEventListener('touchstart', e => { if (e.touches.length===1){ drag360=true; s360X=e.touches[0].clientX; s360Y=e.touches[0].clientY; vel360=0; }}, { passive:true });
+    window.addEventListener('touchmove', e => { if(!drag360||e.touches.length!==1)return; const dx=e.touches[0].clientX-s360X,dy=e.touches[0].clientY-s360Y; s360X=e.touches[0].clientX; s360Y=e.touches[0].clientY; vel360=dx*0.008; angleY+=vel360; angleX=Math.max(-0.45,Math.min(0.45,angleX+dy*0.004)); }, {passive:true});
+    window.addEventListener('touchend', () => drag360 = false);
 
-    window.addEventListener('mouseup', () => {
-      isDragging360 = false;
-    });
+    if (toggle360AutoBtn) toggle360AutoBtn.addEventListener('click', () => { autoRot = !autoRot; toggle360AutoBtn.classList.toggle('active', autoRot); if(autoRotateIcon) autoRotateIcon.textContent = autoRot ? '❚❚' : '▶'; showToast(autoRot ? 'Auto-rotación activada' : 'Control manual'); });
+    if (reset360Btn) reset360Btn.addEventListener('click', () => { angleY=0; angleX=0.18; vel360=0; showToast('Vista reiniciada'); });
+    if (speedSlider) speedSlider.addEventListener('input', e => rotSpd = parseFloat(e.target.value));
+    if (wireframeToggleBtn) wireframeToggleBtn.addEventListener('click', () => { wireframe = !wireframe; wireframeToggleBtn.classList.toggle('active', wireframe); showToast(wireframe ? 'Modo wireframe' : 'Modo sólido'); });
+    sculptureTabs.forEach(tab => tab.addEventListener('click', () => {
+      sculptureTabs.forEach(t => t.classList.remove('active')); tab.classList.add('active');
+      cModel = tab.dataset.sculpture;
+      if (sculptureNameLabel) sculptureNameLabel.textContent = { monolith:'MONOLITO CRISTAL // 2026', prism:'PRISMA FRACTAL // 2025', sphere:'ESFERA GEODÉSICA // 2024' }[cModel];
+      showToast(`Escultura: ${tab.textContent.trim()}`);
+    }));
+  }
 
-    window.addEventListener('mousemove', (e) => {
-      if (!isDragging360) return;
-      const dx = e.clientX - startX;
-      const dy = e.clientY - startY;
-      startX = e.clientX;
-      startY = e.clientY;
+  /* ══════════════════════════════════════════════════════════════
+     9. SECCIÓN L&S: SALA INMERSIVA COMPLETA
+        - Botón de pantalla completa
+        - Animación de "vuelo de entrada" a la sala
+        - Piso de vidrio oscuro con partículas flotantes
+        - Pantallas laterales interactivas (partículas + ondas + luz)
+     ══════════════════════════════════════════════════════════════ */
+  const roomCanvas   = document.getElementById('virtualRoomCanvas');
+  const lsSection    = document.getElementById('ls');
+  const coordX       = document.getElementById('coordX');
+  const coordZ       = document.getElementById('coordZ');
+  const coordAngle   = document.getElementById('coordAngle');
+  const lightRange   = document.getElementById('lightIntensityRange');
+  const lightSelect  = document.getElementById('spotlightColorSelect');
+  const roomAudioBtn = document.getElementById('audioAmbientRoomBtn');
+  const synthPulse   = document.getElementById('synthPulse');
+  const synthStatus  = document.getElementById('synthStatusText');
+  const hotspot      = document.getElementById('hotspotCenter');
+  const btnFpsMode   = document.getElementById('btnFpsMode');
+  const fpsCrosshair = document.getElementById('fpsCrosshair');
+  const minimapCanvas= document.getElementById('minimapCanvas');
 
-      velocityX = dx * 0.008;
-      angleY += velocityX;
-      // Inclinación vertical restringida
-      angleX = Math.max(-0.4, Math.min(0.4, angleX + dy * 0.004));
-    });
+  // ── Botón de Pantalla Completa ─────────────────────────────
+  const roomCard = document.getElementById('virtualRoomCard');
+  if (roomCard) {
+    const fsBtn = document.createElement('button');
+    fsBtn.id = 'lsFullscreenBtn';
+    fsBtn.className = 'tool-btn ls-fullscreen-btn';
+    fsBtn.innerHTML = '<span class="tool-icon">⤢</span><span>PANTALLA COMPLETA</span>';
+    const hud = roomCard.querySelector('.room-hud-bar');
+    if (hud) hud.appendChild(fsBtn);
 
-    // Touch en móviles
-    canvas360.addEventListener('touchstart', (e) => {
-      if (e.touches.length === 1) {
-        isDragging360 = true;
-        startX = e.touches[0].clientX;
-        startY = e.touches[0].clientY;
-        velocityX = 0;
+    fsBtn.addEventListener('click', () => {
+      if (!document.fullscreenElement) {
+        roomCard.requestFullscreen().catch(err => console.warn(err));
+        fsBtn.innerHTML = '<span class="tool-icon">⤡</span><span>SALIR PANTALLA COMPLETA</span>';
+      } else {
+        document.exitFullscreen();
+        fsBtn.innerHTML = '<span class="tool-icon">⤢</span><span>PANTALLA COMPLETA</span>';
       }
-    }, { passive: true });
-
-    window.addEventListener('touchmove', (e) => {
-      if (!isDragging360 || e.touches.length !== 1) return;
-      const dx = e.touches[0].clientX - startX;
-      const dy = e.touches[0].clientY - startY;
-      startX = e.touches[0].clientX;
-      startY = e.touches[0].clientY;
-
-      velocityX = dx * 0.008;
-      angleY += velocityX;
-      angleX = Math.max(-0.4, Math.min(0.4, angleX + dy * 0.004));
-    }, { passive: true });
-
-    window.addEventListener('touchend', () => { isDragging360 = false; });
-
-    // Controles de barra
-    if (toggle360AutoBtn) {
-      toggle360AutoBtn.addEventListener('click', () => {
-        autoRotate = !autoRotate;
-        toggle360AutoBtn.classList.toggle('active', autoRotate);
-        if (autoRotateIcon) autoRotateIcon.textContent = autoRotate ? '❚❚' : '▶';
-        showToast(autoRotate ? 'Auto-rotación activada' : 'Control manual activo');
-      });
-    }
-
-    if (reset360Btn) {
-      reset360Btn.addEventListener('click', () => {
-        angleY = 0;
-        angleX = 0.15;
-        velocityX = 0;
-        showToast('Vista 360° reiniciada');
-      });
-    }
-
-    if (speedSlider) {
-      speedSlider.addEventListener('input', (e) => {
-        rotateSpeed = parseFloat(e.target.value);
-      });
-    }
-
-    if (wireframeToggleBtn) {
-      wireframeToggleBtn.addEventListener('click', () => {
-        wireframeMode = !wireframeMode;
-        wireframeToggleBtn.classList.toggle('active', wireframeMode);
-        showToast(wireframeMode ? 'Modo Estructura Wireframe' : 'Modo Sólido Shaded');
-      });
-    }
-
-    // Selector de esculturas
-    sculptureTabs.forEach(tab => {
-      tab.addEventListener('click', () => {
-        sculptureTabs.forEach(t => t.classList.remove('active'));
-        tab.classList.add('active');
-        currentModel = tab.getAttribute('data-sculpture');
-
-        if (sculptureNameLabel) {
-          const names = {
-            monolith: 'MONOLITO OBSIDIANA // 2026',
-            prism: 'PRISMA FRACTAL // 2025',
-            sphere: 'ESFERA GEODÉSICA // 2024'
-          };
-          sculptureNameLabel.textContent = names[currentModel] || 'ESCULTURA 360°';
-        }
-        showToast(`Escultura: ${tab.textContent.trim()}`);
-      });
+    });
+    document.addEventListener('fullscreenchange', () => {
+      if (!document.fullscreenElement) {
+        fsBtn.innerHTML = '<span class="tool-icon">⤢</span><span>PANTALLA COMPLETA</span>';
+        if (roomCanvas) { roomCanvas.width = roomCanvas.parentElement.clientWidth; roomCanvas.height = roomCanvas.parentElement.clientHeight; }
+      } else {
+        if (roomCanvas) { roomCanvas.width = window.innerWidth; roomCanvas.height = window.innerHeight; }
+      }
     });
   }
 
-  /* ==========================================================================
-     9. PÁGINA INTERNA 3: SECCIÓN L&S (LUZ & SONIDO - RECORRER ESPACIO CON MOUSE)
-     ========================================================================== */
-  const roomCanvas = document.getElementById('virtualRoomCanvas');
-  const coordX = document.getElementById('coordX');
-  const coordZ = document.getElementById('coordZ');
-  const coordAngle = document.getElementById('coordAngle');
-  const lightIntensityRange = document.getElementById('lightIntensityRange');
-  const spotlightColorSelect = document.getElementById('spotlightColorSelect');
-  const audioAmbientRoomBtn = document.getElementById('audioAmbientRoomBtn');
-  const synthPulse = document.getElementById('synthPulse');
-  const synthStatusText = document.getElementById('synthStatusText');
-  const hotspotCenter = document.getElementById('hotspotCenter');
-
   if (roomCanvas) {
     const ctx = roomCanvas.getContext('2d');
+    const miniCtx = minimapCanvas ? minimapCanvas.getContext('2d') : null;
 
-    // Estado del observador en la galería 3D
+    // ── Estado de la cámara y física tipo videojuego 3D ────────
     const camera = {
       x: 0,
       y: 0,
-      z: 3.5, // Distancia focal al centro
-      yaw: 0,   // Giro horizontal (360 alrededor de la obra)
-      pitch: 0  // Inclinación vertical
+      z: 8,
+      yaw: 0,
+      pitch: 0.05,
+      targetYaw: 0,
+      targetPitch: 0.05,
+      vx: 0,
+      vz: 0,
+      headBob: 0,
+      isMoving: false
     };
 
-    let isMouseLooking = false;
-    let lastMouseX = 0, lastMouseY = 0;
-    let lightIntensity = 0.6;
-    let lightColorMode = 'pure-white';
-    let roomSoundActive = false;
+    let isPointerLocked = false;
+    let mouseDownWalk = false;
+    let mouseBackWalk = false;
+    let lookMode = false, lastMX = 0, lastMY = 0;
+    let lightVal = 0.6, lightMode = 'pure-white', roomSound = false;
+    let walkStepCycle = 0;
 
-    // Redimensionar canvas de acuerdo al contenedor
-    function resizeRoomCanvas() {
-      roomCanvas.width = roomCanvas.parentElement.clientWidth;
+    // ── Animación de entrada: "vuelo" de z=8 a z=3.5 ────────
+    let flyIn = true, flyProgress = 0;
+    const FLY_DURATION = 2000; // ms
+    let flyStart = null;
+
+    // ── Partículas ambientales flotantes en el espacio 3D ────
+    const spaceParticles = Array.from({ length: 70 }, () => ({
+      x: (Math.random() - 0.5) * 8.5,
+      y: -2.0 + Math.random() * 3.2,
+      z: (Math.random() - 0.5) * 11,
+      vx: (Math.random() - 0.5) * 0.002,
+      vy: (Math.random() - 0.5) * 0.0015,
+      vz: (Math.random() - 0.5) * 0.002,
+      size: Math.random() * 0.035 + 0.015,
+      alpha: Math.random() * 0.6 + 0.2,
+      phase: Math.random() * Math.PI * 2
+    }));
+
+    // ── Pantallas laterales interactivas ─────────────────────
+    const screens = [
+      { wx: -4.3, wz: 0.0,  width: 2.6, height: 1.6, particles: [], waves: [], lastTouch: 0, hovered: false, title: 'FRECUENCIAS SÓNICAS 01' },
+      { wx:  4.3, wz: 0.0,  width: 2.6, height: 1.6, particles: [], waves: [], lastTouch: 0, hovered: false, title: 'ONDAS DE LUZ REACTIVAS 02' }
+    ];
+    screens.forEach(sc => {
+      sc.particles = Array.from({ length: 22 }, () => ({
+        x: Math.random(), y: Math.random(), vx: (Math.random()-0.5)*0.008, vy: (Math.random()-0.5)*0.008,
+        r: Math.random()*0.04+0.02, a: 0, target_a: 0
+      }));
+    });
+
+    // ── Resize ────────────────────────────────────────────────
+    function resizeRoom() {
+      roomCanvas.width  = roomCanvas.parentElement.clientWidth;
       roomCanvas.height = roomCanvas.parentElement.clientHeight;
     }
-    resizeRoomCanvas();
-    window.addEventListener('resize', resizeRoomCanvas);
+    resizeRoom();
+    window.addEventListener('resize', resizeRoom);
 
-    // Motor de renderizado en perspectiva de la sala de la galería
-    function renderGalleryRoom() {
-      const w = roomCanvas.width;
-      const h = roomCanvas.height;
-      ctx.clearRect(0, 0, w, h);
+    // ── Proyección 3D en Perspectiva ──────────────────────────
+    function project3D(px, py, pz) {
+      let rx = px - camera.x;
+      let ry = py - (camera.y + camera.headBob);
+      let rz = pz - camera.z;
 
-      const fov = 420;
-      const cx = w / 2;
-      const cy = h / 2;
+      const cy2 = Math.cos(camera.yaw), sy = Math.sin(camera.yaw);
+      const x1 = rx * cy2 + rz * sy;
+      const z1 = -rx * sy + rz * cy2;
 
-      // Transformación de punto 3D del mundo a 2D en pantalla
-      function project3D(px, py, pz) {
-        // Traslación relativa a la cámara
-        let rx = px - camera.x;
-        let ry = py - camera.y;
-        let rz = pz - camera.z;
+      const cp = Math.cos(camera.pitch), sp = Math.sin(camera.pitch);
+      const y2 = ry * cp - z1 * sp;
+      const z2 = ry * sp + z1 * cp;
 
-        // Rotación Yaw (Giro horizontal alrededor de la obra)
-        const cosYaw = Math.cos(camera.yaw);
-        const sinYaw = Math.sin(camera.yaw);
-        const x1 = rx * cosYaw + rz * sinYaw;
-        const z1 = -rx * sinYaw + rz * cosYaw;
+      if (z2 <= 0.08) return null;
+      const fov = roomCanvas.height * 0.72;
+      const sc = fov / z2;
+      return { x: roomCanvas.width / 2 + x1 * sc, y: roomCanvas.height / 2 + y2 * sc, sc, depth: z2 };
+    }
 
-        // Rotación Pitch (Inclinación vertical)
-        const cosPitch = Math.cos(camera.pitch);
-        const sinPitch = Math.sin(camera.pitch);
-        const y2 = ry * cosPitch - z1 * sinPitch;
-        const z2 = ry * sinPitch + z1 * cosPitch;
+    // ── Renderizado del Radar / Minimap ──────────────────────
+    function drawMinimap() {
+      if (!miniCtx || !minimapCanvas) return;
+      const mw = minimapCanvas.width, mh = minimapCanvas.height;
+      miniCtx.clearRect(0, 0, mw, mh);
 
-        if (z2 <= 0.1) return null; // Detrás de la cámara
+      // Fondo del radar
+      miniCtx.fillStyle = '#06080d';
+      miniCtx.fillRect(0, 0, mw, mh);
 
-        const scale = fov / z2;
-        return {
-          x: cx + x1 * scale,
-          y: cy + y2 * scale,
-          scale: scale,
-          depth: z2
-        };
+      // Grilla del radar
+      miniCtx.strokeStyle = 'rgba(255,255,255,0.08)';
+      miniCtx.lineWidth = 1;
+      miniCtx.strokeRect(4, 4, mw - 8, mh - 8);
+      miniCtx.beginPath();
+      miniCtx.moveTo(mw/2, 4); miniCtx.lineTo(mw/2, mh-4);
+      miniCtx.moveTo(4, mh/2); miniCtx.lineTo(mw-4, mh/2);
+      miniCtx.stroke();
+
+      // Mapear coordenadas 3D (-4.5 a 4.5 en X, -5.5 a 5.5 en Z) al minimap
+      const toMx = (x) => mw/2 + (x / 5.2) * (mw/2 - 8);
+      const toMz = (z) => mh/2 + (z / 6.0) * (mh/2 - 8);
+
+      // Escultura central
+      miniCtx.fillStyle = 'rgba(255,255,255,0.4)';
+      miniCtx.beginPath();
+      miniCtx.arc(toMx(0), toMz(0), 4, 0, Math.PI * 2);
+      miniCtx.fill();
+
+      // Pantallas laterales
+      miniCtx.fillStyle = 'rgba(120,180,255,0.7)';
+      miniCtx.fillRect(toMx(-4.3) - 2, toMz(0) - 6, 4, 12);
+      miniCtx.fillRect(toMx(4.3) - 2, toMz(0) - 6, 4, 12);
+
+      // Cono de visión del jugador
+      const px = toMx(camera.x), pz = toMz(camera.z);
+      const viewLen = 14;
+      const leftAngle = camera.yaw - 0.45;
+      const rightAngle = camera.yaw + 0.45;
+
+      miniCtx.fillStyle = 'rgba(255,255,255,0.18)';
+      miniCtx.beginPath();
+      miniCtx.moveTo(px, pz);
+      miniCtx.lineTo(px - Math.sin(leftAngle) * viewLen, pz - Math.cos(leftAngle) * viewLen);
+      miniCtx.lineTo(px - Math.sin(rightAngle) * viewLen, pz - Math.cos(rightAngle) * viewLen);
+      miniCtx.closePath();
+      miniCtx.fill();
+
+      // Punto del jugador
+      miniCtx.fillStyle = '#ffffff';
+      miniCtx.shadowColor = '#ffffff';
+      miniCtx.shadowBlur = 6;
+      miniCtx.beginPath();
+      miniCtx.arc(px, pz, 3, 0, Math.PI * 2);
+      miniCtx.fill();
+      miniCtx.shadowBlur = 0;
+    }
+
+    // ── Teclado WASD / Flechas / Shift (Sprint) ────────────────
+    const keys = {};
+    window.addEventListener('keydown', e => {
+      const aEl = document.activeElement;
+      if (aEl && (aEl.tagName==='INPUT'||aEl.tagName==='TEXTAREA')) return;
+      keys[e.key.toLowerCase()] = true;
+    });
+    window.addEventListener('keyup', e => {
+      keys[e.key.toLowerCase()] = false;
+    });
+
+    // ── Loop Principal de Render y Videojuego 3D ───────────────
+    function renderRoom(ts) {
+      const W = roomCanvas.width, H = roomCanvas.height;
+      ctx.clearRect(0, 0, W, H);
+      const t = ts * 0.001;
+
+      // — Animación de entrada (fly-in suave) —
+      if (flyIn) {
+        if (!flyStart) flyStart = ts;
+        flyProgress = Math.min(1, (ts - flyStart) / FLY_DURATION);
+        const ease = 1 - Math.pow(1 - flyProgress, 3);
+        camera.z = 8 - ease * 4.5; // z: 8 → 3.5
+        camera.pitch = 0.05 + Math.sin(flyProgress * Math.PI) * 0.08;
+        if (flyProgress >= 1) { flyIn = false; camera.z = 3.5; camera.pitch = 0.05; }
       }
 
-      // Fondo de la sala (Penumbras de museo contemporáneo)
-      const grad = ctx.createRadialGradient(cx, cy, 50, cx, cy, Math.max(w, h));
-      if (lightColorMode === 'warm-noir') {
-        grad.addColorStop(0, `rgba(45, 45, 45, ${lightIntensity})`);
-        grad.addColorStop(1, '#050505');
-      } else if (lightColorMode === 'deep-contrast') {
-        grad.addColorStop(0, `rgba(30, 30, 30, ${lightIntensity * 0.8})`);
-        grad.addColorStop(1, '#000000');
+      // — Interpolación suave de cámara (Yaw & Pitch) —
+      camera.yaw += (camera.targetYaw - camera.yaw) * 0.25;
+      camera.pitch += (camera.targetPitch - camera.pitch) * 0.25;
+
+      // — Movimiento y física del jugador (Videojuego FPS) —
+      const isSprinting = keys['shift'];
+      const moveSpeed = (isSprinting ? 0.09 : 0.052);
+      const cy2 = Math.cos(camera.yaw), sy = Math.sin(camera.yaw);
+
+      let forward = 0, strafe = 0;
+      if (keys['w'] || keys['arrowup'] || mouseDownWalk)   forward += 1;
+      if (keys['s'] || keys['arrowdown'] || mouseBackWalk) forward -= 1;
+      if (keys['a'] || keys['arrowleft'])                  strafe -= 1;
+      if (keys['d'] || keys['arrowright'])                 strafe += 1;
+
+      if (forward !== 0 || strafe !== 0) {
+        const len = Math.hypot(forward, strafe);
+        forward /= len; strafe /= len;
+        camera.vx += (sy * forward + cy2 * strafe) * moveSpeed;
+        camera.vz += (-cy2 * forward + sy * strafe) * moveSpeed;
+        camera.isMoving = true;
+        walkStepCycle += moveSpeed * 3.5;
+        camera.headBob = Math.sin(walkStepCycle) * 0.035;
       } else {
-        grad.addColorStop(0, `rgba(55, 55, 60, ${lightIntensity})`);
-        grad.addColorStop(1, '#070707');
-      }
-      ctx.fillStyle = grad;
-      ctx.fillRect(0, 0, w, h);
-
-      // Dibujar suelo de hormigón pulido con cuadrícula de perspectiva
-      ctx.strokeStyle = `rgba(255, 255, 255, ${0.15 * lightIntensity})`;
-      ctx.lineWidth = 1;
-
-      // Líneas longitudinales del suelo
-      for (let gx = -4; gx <= 4; gx += 1) {
-        const pStart = project3D(gx, 1.2, -4);
-        const pEnd = project3D(gx, 1.2, 5);
-        if (pStart && pEnd) {
-          ctx.beginPath();
-          ctx.moveTo(pStart.x, pStart.y);
-          ctx.lineTo(pEnd.x, pEnd.y);
-          ctx.stroke();
-        }
+        camera.isMoving = false;
+        camera.headBob *= 0.8;
       }
 
-      // Líneas transversales del suelo
-      for (let gz = -4; gz <= 5; gz += 1) {
-        const pLeft = project3D(-4, 1.2, gz);
-        const pRight = project3D(4, 1.2, gz);
-        if (pLeft && pRight) {
-          ctx.beginPath();
-          ctx.moveTo(pLeft.x, pLeft.y);
-          ctx.lineTo(pRight.x, pRight.y);
-          ctx.stroke();
-        }
-      }
+      // Inercia y fricción
+      camera.x += camera.vx;
+      camera.z += camera.vz;
+      camera.vx *= 0.72;
+      camera.vz *= 0.72;
 
-      // Obras fotográficas en los muros laterales de la galería
-      function drawWallArtwork(x, z, width, height, title) {
-        const p0 = project3D(x, -height/2, z - width/2);
-        const p1 = project3D(x, -height/2, z + width/2);
-        const p2 = project3D(x, height/2, z + width/2);
-        const p3 = project3D(x, height/2, z - width/2);
+      // Colisiones con los muros de la galería
+      camera.x = Math.max(-3.8, Math.min(3.8, camera.x));
+      camera.z = Math.max(-4.4, Math.min(5.2, camera.z));
 
-        if (p0 && p1 && p2 && p3) {
+      // — Fondo & Iluminación Ambiental de la Sala —
+      let ambR, ambG, ambB;
+      if (lightMode === 'warm-noir')       { ambR=34; ambG=30; ambB=28; }
+      else if (lightMode === 'deep-contrast') { ambR=8;  ambG=8;  ambB=8;  }
+      else                                  { ambR=18; ambG=20; ambB=26; }
+      ctx.fillStyle = `rgb(${ambR},${ambG},${ambB})`;
+      ctx.fillRect(0, 0, W, H);
+
+      // — PAREDES ARQUITECTÓNICAS DE LA SALA EN 3D —
+      // Pared trasera (z = -5.5)
+      const pBackTL = project3D(-4.5, -2.4, -5.5);
+      const pBackTR = project3D( 4.5, -2.4, -5.5);
+      const pBackBR = project3D( 4.5,  1.2, -5.5);
+      const pBackBL = project3D(-4.5,  1.2, -5.5);
+
+      if (pBackTL && pBackTR && pBackBR && pBackBL) {
+        ctx.beginPath();
+        ctx.moveTo(pBackTL.x, pBackTL.y);
+        ctx.lineTo(pBackTR.x, pBackTR.y);
+        ctx.lineTo(pBackBR.x, pBackBR.y);
+        ctx.lineTo(pBackBL.x, pBackBL.y);
+        ctx.closePath();
+        const wallGrad = ctx.createLinearGradient(0, pBackTL.y, 0, pBackBL.y);
+        wallGrad.addColorStop(0, `rgba(12, 14, 18, 0.95)`);
+        wallGrad.addColorStop(1, `rgba(5, 6, 8, 0.98)`);
+        ctx.fillStyle = wallGrad;
+        ctx.fill();
+
+        // Estructura monolítica luminosa en la pared trasera
+        const pMonoTL = project3D(-1.2, -2.0, -5.4);
+        const pMonoTR = project3D( 1.2, -2.0, -5.4);
+        const pMonoBR = project3D( 1.2,  0.8, -5.4);
+        const pMonoBL = project3D(-1.2,  0.8, -5.4);
+        if (pMonoTL && pMonoTR && pMonoBR && pMonoBL) {
           ctx.beginPath();
-          ctx.moveTo(p0.x, p0.y);
-          ctx.lineTo(p1.x, p1.y);
-          ctx.lineTo(p2.x, p2.y);
-          ctx.lineTo(p3.x, p3.y);
+          ctx.moveTo(pMonoTL.x, pMonoTL.y);
+          ctx.lineTo(pMonoTR.x, pMonoTR.y);
+          ctx.lineTo(pMonoBR.x, pMonoBR.y);
+          ctx.lineTo(pMonoBL.x, pMonoBL.y);
           ctx.closePath();
-          ctx.fillStyle = 'rgba(240, 240, 240, 0.85)';
+          ctx.fillStyle = `rgba(18, 22, 32, 0.8)`;
           ctx.fill();
-          ctx.strokeStyle = 'rgba(255, 255, 255, 0.4)';
+          ctx.strokeStyle = `rgba(255, 255, 255, ${0.15 + 0.1 * Math.sin(t)})`;
+          ctx.lineWidth = 1.2;
           ctx.stroke();
         }
       }
 
-      drawWallArtwork(-3.8, 0, 1.6, 1.1, 'Muro Oeste');
-      drawWallArtwork(3.8, 0, 1.6, 1.1, 'Muro Este');
+      // — TECHO CON RIELES Y LUCES —
+      const ceilingAlpha = 0.08 * lightVal;
+      ctx.strokeStyle = `rgba(200, 220, 255, ${ceilingAlpha})`;
+      ctx.lineWidth = 1;
+      for (let cx = -4; cx <= 4; cx += 2) {
+        const cA = project3D(cx, -2.3, -5.5), cB = project3D(cx, -2.3, 5.5);
+        if (cA && cB) { ctx.beginPath(); ctx.moveTo(cA.x, cA.y); ctx.lineTo(cB.x, cB.y); ctx.stroke(); }
+      }
 
-      // Haz de luz cenital (Spotlight central en cono)
+      // — HAZ DE LUZ CENITAL VOLUMÉTRICO —
       const spotApex = project3D(0, -3.2, 0);
-      const spotBase1 = project3D(-1.2, 1.2, -1.2);
-      const spotBase2 = project3D(1.2, 1.2, 1.2);
-      if (spotApex && spotBase1 && spotBase2) {
-        const spotGrad = ctx.createLinearGradient(spotApex.x, spotApex.y, (spotBase1.x + spotBase2.x)/2, (spotBase1.y + spotBase2.y)/2);
-        spotGrad.addColorStop(0, `rgba(255, 255, 255, ${0.4 * lightIntensity})`);
-        spotGrad.addColorStop(1, 'rgba(255, 255, 255, 0)');
-        ctx.fillStyle = spotGrad;
+      const spotB1   = project3D(-1.5, 1.15, -1.5);
+      const spotB2   = project3D( 1.5, 1.15,  1.5);
+      if (spotApex && spotB1 && spotB2) {
+        const sg = ctx.createLinearGradient(spotApex.x, spotApex.y, (spotB1.x+spotB2.x)/2, (spotB1.y+spotB2.y)/2);
+        sg.addColorStop(0, `rgba(255,255,255,${0.55 * lightVal})`);
+        sg.addColorStop(0.5, `rgba(240,245,255,${0.2 * lightVal})`);
+        sg.addColorStop(1, 'rgba(255,255,255,0)');
+        ctx.fillStyle = sg;
         ctx.beginPath();
         ctx.moveTo(spotApex.x, spotApex.y);
-        ctx.lineTo(spotBase1.x, spotBase1.y);
-        ctx.lineTo(spotBase2.x, spotBase2.y);
+        ctx.lineTo(spotB1.x, spotB1.y);
+        ctx.lineTo(spotB2.x, spotB2.y);
         ctx.closePath();
         ctx.fill();
       }
 
-      // OBRA CENTRAL: INSTALACIÓN LUMÍNICA & ESCULTURA GEOMÉTRICA
-      const time = performance.now() * 0.0015;
-      const sculptureHeight = 1.0;
-      const rot = time * 0.8;
-
-      // Pedestal monolítico en el centro (0, 0)
-      const pedTop = project3D(0, 0.4, 0);
-      const pedBottom = project3D(0, 1.2, 0);
-      if (pedTop && pedBottom) {
-        ctx.fillStyle = 'rgba(20, 20, 22, 0.9)';
-        ctx.strokeStyle = 'rgba(255, 255, 255, 0.3)';
-        ctx.lineWidth = 1;
-        const radius = 35 * pedTop.scale;
-        ctx.beginPath();
-        ctx.ellipse(pedTop.x, pedTop.y, radius, radius * 0.35, 0, 0, Math.PI * 2);
-        ctx.fill();
-        ctx.stroke();
+      // — PISO DE MÁRMOL OSCURO CON REFLEJOS —
+      const floorAlpha = 0.14 * lightVal;
+      ctx.strokeStyle = `rgba(170, 200, 255, ${floorAlpha})`;
+      ctx.lineWidth = 1;
+      for (let gx = -5; gx <= 5; gx += 1) {
+        const pA = project3D(gx, 1.2, -5.5), pB = project3D(gx, 1.2, 5.5);
+        if (pA && pB) { ctx.beginPath(); ctx.moveTo(pA.x, pA.y); ctx.lineTo(pB.x, pB.y); ctx.stroke(); }
+      }
+      for (let gz = -5; gz <= 5; gz += 1) {
+        const pA = project3D(-5, 1.2, gz), pB = project3D(5, 1.2, gz);
+        if (pA && pB) { ctx.beginPath(); ctx.moveTo(pA.x, pA.y); ctx.lineTo(pB.x, pB.y); ctx.stroke(); }
       }
 
-      // Escultura flotante que pulsa y gira
-      const numRings = 4;
-      for (let r = 0; r < numRings; r++) {
-        const ringY = -0.3 + (r - 1.5) * 0.25;
-        const ringRad = 0.5 + Math.sin(time + r) * 0.08;
-        const segments = 12;
-
+      // Reflejo especular en el centro del piso
+      const floorCenter = project3D(0, 1.19, 0);
+      if (floorCenter) {
+        const fg = ctx.createRadialGradient(floorCenter.x, floorCenter.y, 0, floorCenter.x, floorCenter.y, 180 * floorCenter.sc);
+        fg.addColorStop(0, `rgba(210,230,255,${0.25 * lightVal + 0.05 * Math.sin(t * 1.8)})`);
+        fg.addColorStop(0.6, `rgba(180,210,255,${0.08 * lightVal})`);
+        fg.addColorStop(1, 'rgba(180,210,255,0)');
+        ctx.fillStyle = fg;
         ctx.beginPath();
-        let firstPt = null;
-        for (let s = 0; s <= segments; s++) {
-          const ang = (s / segments) * Math.PI * 2 + rot * (r % 2 === 0 ? 1 : -1);
-          const px = ringRad * Math.cos(ang);
-          const pz = ringRad * Math.sin(ang);
-          const p = project3D(px, ringY, pz);
+        ctx.ellipse(floorCenter.x, floorCenter.y, 220 * floorCenter.sc, 70 * floorCenter.sc, 0, 0, Math.PI * 2);
+        ctx.fill();
+      }
+
+      // Partículas y motes de luz flotando en 3D
+      spaceParticles.forEach(p => {
+        p.x += p.vx; p.y += p.vy; p.z += p.vz;
+        if (p.x > 4.2) p.x = -4.2; if (p.x < -4.2) p.x = 4.2;
+        if (p.y > 1.2) p.y = -2.0; if (p.y < -2.0) p.y = 1.2;
+        if (p.z > 5.4) p.z = -5.4; if (p.z < -5.4) p.z = 5.4;
+
+        const glimmer = 0.4 + 0.6 * Math.sin(t * 2 + p.phase);
+        const pp = project3D(p.x, p.y, p.z);
+        if (!pp) return;
+        const pr = Math.max(1, p.size * pp.sc * 14);
+        ctx.fillStyle = `rgba(180, 210, 255, ${p.alpha * glimmer * lightVal})`;
+        ctx.beginPath();
+        ctx.arc(pp.x, pp.y, pr, 0, Math.PI * 2);
+        ctx.fill();
+      });
+
+      // — PANTALLAS LATERALES INTERACTIVAS —
+      screens.forEach(sc => {
+        const hw = sc.width / 2, hh = sc.height / 2;
+        const corners = [
+          project3D(sc.wx, -hh - 0.2, sc.wz - hw),
+          project3D(sc.wx, -hh - 0.2, sc.wz + hw),
+          project3D(sc.wx,  hh - 0.2, sc.wz + hw),
+          project3D(sc.wx,  hh - 0.2, sc.wz - hw)
+        ].filter(Boolean);
+
+        if (corners.length < 4) return;
+
+        const lastTouchAge = (performance.now() - sc.lastTouch) / 1000;
+        const screenGlow = sc.hovered ? 0.45 : Math.max(0, 1 - lastTouchAge * 0.6) * 0.55;
+
+        // Borde y marco
+        ctx.beginPath();
+        ctx.moveTo(corners[0].x, corners[0].y);
+        corners.forEach(c => ctx.lineTo(c.x, c.y));
+        ctx.closePath();
+
+        const screenBg = ctx.createLinearGradient(corners[0].x, corners[0].y, corners[2].x, corners[2].y);
+        screenBg.addColorStop(0, `rgba(8,10,18,${0.92 - screenGlow * 0.2})`);
+        screenBg.addColorStop(1, `rgba(12,16,28,${0.88 - screenGlow * 0.1})`);
+        ctx.fillStyle = screenBg;
+        ctx.fill();
+
+        ctx.strokeStyle = `rgba(180,210,255,${0.25 + screenGlow * 0.65})`;
+        ctx.lineWidth = 1.8;
+        ctx.stroke();
+
+        // Render interactivo dentro de la pantalla
+        const minX = Math.min(...corners.map(c=>c.x)), maxX = Math.max(...corners.map(c=>c.x));
+        const minY = Math.min(...corners.map(c=>c.y)), maxY = Math.max(...corners.map(c=>c.y));
+        const sw = maxX - minX, sh = maxY - minY;
+
+        ctx.save();
+        ctx.beginPath();
+        ctx.moveTo(corners[0].x, corners[0].y);
+        corners.forEach(c => ctx.lineTo(c.x, c.y));
+        ctx.closePath();
+        ctx.clip();
+
+        // Partículas reactivas
+        sc.particles.forEach(p => {
+          p.x += p.vx * (1 + screenGlow * 3);
+          p.y += p.vy * (1 + screenGlow * 3);
+          if (p.x < 0 || p.x > 1) p.vx *= -1;
+          if (p.y < 0 || p.y > 1) p.vy *= -1;
+          p.a = p.a * 0.92 + p.target_a * 0.08;
+
+          const px2 = minX + p.x * sw, py2 = minY + p.y * sh;
+          ctx.fillStyle = `rgba(200,225,255,${0.2 + p.a * 0.8})`;
+          ctx.beginPath();
+          ctx.arc(px2, py2, p.r * corners[0].sc * 18, 0, Math.PI * 2);
+          ctx.fill();
+        });
+
+        // Ondas de choque
+        sc.waves = sc.waves.filter(w => w.alpha > 0.01);
+        sc.waves.forEach(w => {
+          w.r += 1.8 * (1 + screenGlow);
+          w.alpha *= 0.94;
+          const wox = minX + w.cx * sw, woy = minY + w.cy * sh;
+          ctx.strokeStyle = `rgba(200,230,255,${w.alpha * screenGlow})`;
+          ctx.lineWidth = 1.4;
+          ctx.beginPath();
+          ctx.arc(wox, woy, w.r, 0, Math.PI * 2);
+          ctx.stroke();
+        });
+
+        ctx.restore();
+      });
+
+      // — OBRA CENTRAL: ESCULTURA GIROSCÓPICA LUMÍNICA —
+      const rot2 = t * 0.8;
+      for (let r = 0; r < 5; r++) {
+        const ry = -0.35 + (r - 2) * 0.28;
+        const rr = 0.48 + Math.sin(t * 1.3 + r) * 0.08;
+        ctx.beginPath();
+        let first2 = null;
+        for (let s = 0; s <= 16; s++) {
+          const ang = (s / 16) * Math.PI * 2 + rot2 * (r % 2 === 0 ? 1 : -1);
+          const p = project3D(rr * Math.cos(ang), ry, rr * Math.sin(ang));
           if (p) {
-            if (!firstPt) { firstPt = p; ctx.moveTo(p.x, p.y); }
-            else { ctx.lineTo(p.x, p.y); }
+            if (!first2) { first2 = p; ctx.moveTo(p.x, p.y); }
+            else ctx.lineTo(p.x, p.y);
           }
         }
-        ctx.strokeStyle = r === 1 ? '#ffffff' : `rgba(255, 255, 255, ${0.4 + 0.4 * Math.sin(time + r)})`;
-        ctx.lineWidth = r === 1 ? 2 : 1.2;
+        const pulse = 0.5 + 0.45 * Math.sin(t * 2.2 + r);
+        ctx.strokeStyle = r === 2 ? `rgba(255,255,255,${0.75 + pulse * 0.25})` : `rgba(240,245,255,${pulse * 0.6})`;
+        ctx.lineWidth = r === 2 ? 2.4 : 1.2;
         ctx.stroke();
       }
 
-      // Proyectar hotspot central
-      const centerProj = project3D(0, -0.4, 0);
-      if (centerProj && hotspotCenter) {
-        hotspotCenter.style.left = `${centerProj.x}px`;
-        hotspotCenter.style.top = `${centerProj.y}px`;
-        hotspotCenter.style.display = centerProj.depth > 0.5 ? 'block' : 'none';
+      // Núcleo central brillante
+      const pCore = project3D(0, -0.35, 0);
+      if (pCore) {
+        const coreRad = Math.max(3, 14 * pCore.sc);
+        const cg = ctx.createRadialGradient(pCore.x, pCore.y, 0, pCore.x, pCore.y, coreRad);
+        cg.addColorStop(0, '#ffffff');
+        cg.addColorStop(0.4, 'rgba(210,230,255,0.8)');
+        cg.addColorStop(1, 'rgba(210,230,255,0)');
+        ctx.fillStyle = cg;
+        ctx.beginPath();
+        ctx.arc(pCore.x, pCore.y, coreRad, 0, Math.PI * 2);
+        ctx.fill();
       }
 
-      // Actualizar HUD numérico de coordenadas
+      // Hotspot central proyectado
+      if (pCore && hotspot) {
+        hotspot.style.left = `${pCore.x}px`;
+        hotspot.style.top = `${pCore.y}px`;
+        hotspot.style.display = pCore.depth > 0.5 ? 'block' : 'none';
+      }
+
+      // Actualizar HUD
       if (coordX) coordX.textContent = camera.x.toFixed(1);
       if (coordZ) coordZ.textContent = camera.z.toFixed(1);
       if (coordAngle) {
@@ -1306,210 +1315,182 @@ document.addEventListener('DOMContentLoaded', () => {
         coordAngle.textContent = `${deg}°`;
       }
 
-      // Modulación sonora basada en la distancia a la obra central
-      const distanceToCenter = Math.sqrt(camera.x * camera.x + camera.z * camera.z);
-      if (roomSoundActive) {
-        galleryAudio.modulate(distanceToCenter / 5, camera.yaw);
+      // Modular Audio reactivo
+      const distToCenter = Math.hypot(camera.x, camera.z);
+      if (roomSound) galleryAudio.modulate(distToCenter / 5);
+
+      // Dibujar Radar Minimap
+      drawMinimap();
+
+      requestAnimationFrame(renderRoom);
+    }
+    requestAnimationFrame(renderRoom);
+
+    // ── NAVEGACIÓN ESTILO VIDEOJUEGO 3D CON EL MOUSE ─────────
+
+    // 1. Pointer Lock API (Fijación de Mouse FPS)
+    function enterPointerLock() {
+      roomCanvas.requestPointerLock = roomCanvas.requestPointerLock || roomCanvas.mozRequestPointerLock;
+      if (roomCanvas.requestPointerLock) {
+        roomCanvas.requestPointerLock();
+      }
+    }
+
+    if (btnFpsMode) {
+      btnFpsMode.addEventListener('click', () => {
+        if (!isPointerLocked) enterPointerLock();
+        else document.exitPointerLock();
+      });
+    }
+
+    document.addEventListener('pointerlockchange', handlePointerLockChange);
+    document.addEventListener('mozpointerlockchange', handlePointerLockChange);
+
+    function handlePointerLockChange() {
+      isPointerLocked = (document.pointerLockElement === roomCanvas || document.mozPointerLockElement === roomCanvas);
+      if (btnFpsMode) {
+        btnFpsMode.classList.toggle('active', isPointerLocked);
+        btnFpsMode.innerHTML = isPointerLocked ?
+          '<span class="game-icon">🟢</span> MODO FPS ACTIVO (PULSA ESC PARA SALIR)' :
+          '<span class="game-icon">🎮</span> MODO VIDEOJUEGO 3D (CLIC PARA ACTIVAR)';
+      }
+      if (fpsCrosshair) fpsCrosshair.classList.toggle('active', isPointerLocked);
+      roomCanvas.style.cursor = isPointerLocked ? 'none' : 'crosshair';
+    }
+
+    // 2. Movimiento del Mouse en 360° (FPS Look o Drag Look)
+    window.addEventListener('mousemove', e => {
+      if (isPointerLocked) {
+        // En modo videojuego FPS: movimiento directo y fluido
+        const sensitivity = 0.0032;
+        camera.targetYaw   += e.movementX * sensitivity;
+        camera.targetPitch  = Math.max(-0.45, Math.min(0.42, camera.targetPitch + e.movementY * (sensitivity * 0.8)));
+      } else if (lookMode) {
+        // Modo arrastre tradicional con el mouse
+        const dx = e.clientX - lastMX;
+        const dy = e.clientY - lastMY;
+        camera.targetYaw   += dx * 0.0055;
+        camera.targetPitch  = Math.max(-0.45, Math.min(0.42, camera.targetPitch + dy * 0.004));
+        lastMX = e.clientX;
+        lastMY = e.clientY;
+      }
+    });
+
+    // 3. Clic / Rueda de ratón para caminar en la sala
+    roomCanvas.addEventListener('mousedown', e => {
+      if (!isPointerLocked && e.button === 0) {
+        lookMode = true;
+        lastMX = e.clientX;
+        lastMY = e.clientY;
+        roomCanvas.style.cursor = 'grabbing';
       }
 
-      requestAnimationFrame(renderGalleryRoom);
-    }
-
-    renderGalleryRoom();
-
-    // INTERACCIÓN CON EL MOUSE: Girar alrededor de la obra con el mouse
-    roomCanvas.addEventListener('mousedown', (e) => {
-      isMouseLooking = true;
-      lastMouseX = e.clientX;
-      lastMouseY = e.clientY;
+      if (isPointerLocked) {
+        if (e.button === 0) mouseDownWalk = true; // Clic izquierdo: caminar adelante
+        if (e.button === 2) mouseBackWalk = true; // Clic derecho: caminar atrás
+      }
     });
 
-    window.addEventListener('mouseup', () => { isMouseLooking = false; });
-
-    window.addEventListener('mousemove', (e) => {
-      if (!isMouseLooking) return;
-      const dx = e.clientX - lastMouseX;
-      const dy = e.clientY - lastMouseY;
-      lastMouseX = e.clientX;
-      lastMouseY = e.clientY;
-
-      // El usuario gira alrededor del espacio de la galería
-      camera.yaw += dx * 0.007;
-      camera.pitch = Math.max(-0.4, Math.min(0.35, camera.pitch + dy * 0.004));
+    window.addEventListener('mouseup', e => {
+      lookMode = false;
+      if (!isPointerLocked) roomCanvas.style.cursor = 'crosshair';
+      mouseDownWalk = false;
+      mouseBackWalk = false;
     });
 
-    // Control de paso/caminar por teclado (W, A, S, D y Flechas)
-    window.addEventListener('keydown', (e) => {
-      const activeEl = document.activeElement;
-      if (activeEl && (activeEl.tagName === 'INPUT' || activeEl.tagName === 'TEXTAREA')) return;
+    // Rueda del ratón: avanzar o retroceder de inmediato en la dirección de la mirada
+    roomCanvas.addEventListener('wheel', e => {
+      e.preventDefault();
+      const step = e.deltaY > 0 ? -0.32 : 0.32;
+      const cy2 = Math.cos(camera.yaw), sy = Math.sin(camera.yaw);
+      camera.vx += sy * step;
+      camera.vz -= cy2 * step;
+    }, { passive: false });
 
-      const step = 0.18;
-      const cosYaw = Math.cos(camera.yaw);
-      const sinYaw = Math.sin(camera.yaw);
+    // Evitar menú contextual con clic derecho sobre la sala 3D
+    roomCanvas.addEventListener('contextmenu', e => e.preventDefault());
 
-      switch (e.key.toLowerCase()) {
-        case 'w':
-        case 'arrowup':
-          // Caminar hacia adelante
-          camera.x += sinYaw * step;
-          camera.z -= cosYaw * step;
-          break;
-        case 's':
-        case 'arrowdown':
-          // Retroceder
-          camera.x -= sinYaw * step;
-          camera.z += cosYaw * step;
-          break;
-        case 'a':
-        case 'arrowleft':
-          // Desplazar izquierda
-          camera.x -= cosYaw * step;
-          camera.z -= sinYaw * step;
-          break;
-        case 'd':
-        case 'arrowright':
-          // Desplazar derecha
-          camera.x += cosYaw * step;
-          camera.z += sinYaw * step;
-          break;
+    // Clic en la sala activa el modo FPS o interactúa con pantallas laterales
+    roomCanvas.addEventListener('click', e => {
+      if (!isPointerLocked) {
+        enterPointerLock();
       }
 
-      // Restricción de límites de la sala para que no se salga de las paredes
-      camera.x = Math.max(-3.5, Math.min(3.5, camera.x));
-      camera.z = Math.max(-3.5, Math.min(5.0, camera.z));
-    });
+      // Detección de clic sobre pantallas interactivas
+      const rect = roomCanvas.getBoundingClientRect();
+      const mx = e.clientX - rect.left, my = e.clientY - rect.top;
 
-    // Botones de D-pad en pantalla para dispositivos móviles o clics
-    function attachDpad(btnId, moveAction) {
-      const btn = document.getElementById(btnId);
-      if (!btn) return;
-      btn.addEventListener('click', (e) => {
-        e.preventDefault();
-        moveAction();
-      });
-    }
+      screens.forEach(sc => {
+        const hw = sc.width / 2, hh = sc.height / 2;
+        const corners = [
+          project3D(sc.wx, -hh - 0.2, sc.wz - hw),
+          project3D(sc.wx, -hh - 0.2, sc.wz + hw),
+          project3D(sc.wx,  hh - 0.2, sc.wz + hw),
+          project3D(sc.wx,  hh - 0.2, sc.wz - hw)
+        ].filter(Boolean);
 
-    attachDpad('dpadUp', () => {
-      const cosYaw = Math.cos(camera.yaw), sinYaw = Math.sin(camera.yaw);
-      camera.x += sinYaw * 0.4; camera.z -= cosYaw * 0.4;
-    });
-    attachDpad('dpadDown', () => {
-      const cosYaw = Math.cos(camera.yaw), sinYaw = Math.sin(camera.yaw);
-      camera.x -= sinYaw * 0.4; camera.z += cosYaw * 0.4;
-    });
-    attachDpad('dpadLeft', () => {
-      const cosYaw = Math.cos(camera.yaw), sinYaw = Math.sin(camera.yaw);
-      camera.x -= cosYaw * 0.4; camera.z -= sinYaw * 0.4;
-    });
-    attachDpad('dpadRight', () => {
-      const cosYaw = Math.cos(camera.yaw), sinYaw = Math.sin(camera.yaw);
-      camera.x += cosYaw * 0.4; camera.z += sinYaw * 0.4;
-    });
+        if (corners.length < 4) return;
+        const minX = Math.min(...corners.map(c=>c.x)), maxX = Math.max(...corners.map(c=>c.x));
+        const minY = Math.min(...corners.map(c=>c.y)), maxY = Math.max(...corners.map(c=>c.y));
 
-    // Controles de entorno de la sala
-    if (lightIntensityRange) {
-      lightIntensityRange.addEventListener('input', (e) => {
-        lightIntensity = parseFloat(e.target.value);
-      });
-    }
-
-    if (spotlightColorSelect) {
-      spotlightColorSelect.addEventListener('change', (e) => {
-        lightColorMode = e.target.value;
-      });
-    }
-
-    if (audioAmbientRoomBtn) {
-      audioAmbientRoomBtn.addEventListener('click', () => {
-        const isPlaying = galleryAudio.toggle();
-        roomSoundActive = isPlaying;
-        updateSoundUI(isPlaying);
-        if (isPlaying) {
-          audioAmbientRoomBtn.classList.add('active');
-          if (synthStatusText) synthStatusText.textContent = 'SINTETIZADOR EMITIENDO EN VIVO';
-          if (synthPulse) synthPulse.style.backgroundColor = '#ffffff';
-        } else {
-          audioAmbientRoomBtn.classList.remove('active');
-          if (synthStatusText) synthStatusText.textContent = 'SINTETIZADOR EN ESPERA';
+        if (mx >= minX && mx <= maxX && my >= minY && my <= maxY) {
+          const cx2 = (mx - minX) / (maxX - minX), cy2 = (my - minY) / (maxY - minY);
+          sc.waves.push({ cx: cx2, cy: cy2, r: 0, alpha: 0.95 });
+          sc.particles.forEach(p => { p.target_a = 0.9 + Math.random() * 0.1; });
+          sc.lastTouch = performance.now();
+          galleryAudio.playGlintChime(320 + Math.random() * 380);
+          showToast(`Pantalla interactiva activada: ${sc.title}`);
         }
       });
+    });
+
+    // D-Pad virtual en pantalla
+    function dpad(id, fn) {
+      const b = document.getElementById(id);
+      if (b) b.addEventListener('click', fn);
     }
+    dpad('dpadUp',    () => { const cy2 = Math.cos(camera.yaw), sy = Math.sin(camera.yaw); camera.vx += sy * 0.45; camera.vz -= cy2 * 0.45; });
+    dpad('dpadDown',  () => { const cy2 = Math.cos(camera.yaw), sy = Math.sin(camera.yaw); camera.vx -= sy * 0.45; camera.vz += cy2 * 0.45; });
+    dpad('dpadLeft',  () => { const cy2 = Math.cos(camera.yaw), sy = Math.sin(camera.yaw); camera.vx -= cy2 * 0.45; camera.vz -= sy * 0.45; });
+    dpad('dpadRight', () => { const cy2 = Math.cos(camera.yaw), sy = Math.sin(camera.yaw); camera.vx += cy2 * 0.45; camera.vz += sy * 0.45; });
+
+    // Controles de Iluminación y Sonido
+    if (lightRange) lightRange.addEventListener('input', e => lightVal = parseFloat(e.target.value));
+    if (lightSelect) lightSelect.addEventListener('change', e => lightMode = e.target.value);
+    if (roomAudioBtn) roomAudioBtn.addEventListener('click', () => {
+      const on = galleryAudio.toggle();
+      roomSound = on; updateSoundUI(on);
+      if (on) { roomAudioBtn.classList.add('active'); if(synthStatus) synthStatus.textContent='SINTETIZADOR EMITIENDO'; if(synthPulse) synthPulse.style.backgroundColor='#fff'; }
+      else    { roomAudioBtn.classList.remove('active'); if(synthStatus) synthStatus.textContent='SINTETIZADOR EN ESPERA'; }
+    });
   }
 
-  /* ==========================================================================
-     10. PÁGINA: FORMULARIO DE CONTACTO & VALIDACIÓN
-     ========================================================================== */
-  const contactForm = document.getElementById('contactForm');
-  const formSuccessMessage = document.getElementById('formSuccessMessage');
-  const btnDismissSuccess = document.getElementById('btnDismissSuccess');
+  /* ══════════════════════════════════════════════════════════════
+     10. FORMULARIO DE CONTACTO
+     ══════════════════════════════════════════════════════════════ */
+  const contactForm   = document.getElementById('contactForm');
+  const formSuccess   = document.getElementById('formSuccessMessage');
+  const btnDismiss    = document.getElementById('btnDismissSuccess');
 
   if (contactForm) {
-    contactForm.addEventListener('submit', (e) => {
+    contactForm.addEventListener('submit', e => {
       e.preventDefault();
-
-      let isValid = true;
-      const nameInput = document.getElementById('contactName');
-      const emailInput = document.getElementById('contactEmail');
-      const messageInput = document.getElementById('contactMessage');
-      const nameError = document.getElementById('nameError');
-      const emailError = document.getElementById('emailError');
-      const messageError = document.getElementById('messageError');
-
-      // Validar nombre
-      if (!nameInput.value.trim()) {
-        isValid = false;
-        if (nameError) {
-          nameError.textContent = 'Por favor, ingresa tu nombre completo.';
-          nameError.style.display = 'block';
-        }
-      } else if (nameError) {
-        nameError.style.display = 'none';
-      }
-
-      // Validar email
-      const emailPattern = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-      if (!emailPattern.test(emailInput.value.trim())) {
-        isValid = false;
-        if (emailError) {
-          emailError.textContent = 'Ingresa una dirección de correo válida.';
-          emailError.style.display = 'block';
-        }
-      } else if (emailError) {
-        emailError.style.display = 'none';
-      }
-
-      // Validar mensaje
-      if (!messageInput.value.trim()) {
-        isValid = false;
-        if (messageError) {
-          messageError.textContent = 'Por favor, escribe un mensaje o consulta.';
-          messageError.style.display = 'block';
-        }
-      } else if (messageError) {
-        messageError.style.display = 'none';
-      }
-
-      if (isValid) {
-        if (formSuccessMessage) {
-          formSuccessMessage.classList.add('visible');
-        }
-        contactForm.reset();
-        galleryAudio.playGlintChime(660);
-      }
-    });
-
-    if (btnDismissSuccess) {
-      btnDismissSuccess.addEventListener('click', () => {
-        if (formSuccessMessage) {
-          formSuccessMessage.classList.remove('visible');
-        }
+      let ok = true;
+      [['contactName','nameError','Por favor, ingresa tu nombre.'],
+       ['contactEmail','emailError','Ingresa un correo válido.'],
+       ['contactMessage','messageError','Por favor, escribe un mensaje.']
+      ].forEach(([id,errId,msg]) => {
+        const input = document.getElementById(id);
+        const err   = document.getElementById(errId);
+        const valid = id==='contactEmail' ? /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(input?.value?.trim()) : !!input?.value?.trim();
+        if (!valid) { ok=false; if(err){err.textContent=msg;err.style.display='block';} }
+        else { if(err) err.style.display='none'; }
       });
-    }
+      if (ok) { formSuccess?.classList.add('visible'); contactForm.reset(); galleryAudio.playGlintChime(660); }
+    });
+    if (btnDismiss) btnDismiss.addEventListener('click', () => formSuccess?.classList.remove('visible'));
   }
 
-  // Atajo de bienvenida
-  setTimeout(() => {
-    showToast('Bienvenido a Galería Cero // Explora las salas');
-  }, 1000);
-
+  // Toast de bienvenida
+  setTimeout(() => showToast('Bienvenido a Galería Cero // Explora las salas'), 900);
 });

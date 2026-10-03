@@ -133,7 +133,7 @@
               <span class="live-dot"></span> VISTA PREVIA DINÁMICA
             </div>
 
-            <!-- Slides del Mini-Carrusel en Home -->
+            <!-- Slides del Carrusel Vertical Tipo Rueda en Home -->
             <div class="slider-viewport">
               <div class="slider-track" id="homeSliderTrack">
                 <!-- Slide 1 -->
@@ -168,17 +168,22 @@
                     <h4 class="caption-title">El Silencio de la Mirada (2023)</h4>
                   </div>
                 </div>
-              </div>
-            </div>
-
-            <!-- Controles del Slider Directo -->
-            <div class="slider-controls-bar">
-              <div class="slider-counter">
-                <span id="homeSlideCurrent">01</span> / <span id="homeSlideTotal">04</span>
-              </div>
-              <div class="slider-nav-btns">
-                <button class="slider-arrow-btn" id="homeSliderPrev" aria-label="Fotografía anterior">←</button>
-                <button class="slider-arrow-btn" id="homeSliderNext" aria-label="Fotografía siguiente">→</button>
+                <!-- Slide 5 -->
+                <div class="home-slide" data-index="4">
+                  <img src="assets/images/pics/obra5.jpg" onerror="this.onerror=null; this.src='https://images.unsplash.com/photo-1600585154340-be6161a56a0c?auto=format&fit=crop&w=1200&q=80'" alt="Planos en Colisión" loading="lazy">
+                  <div class="slide-caption glass-caption">
+                    <span class="caption-artist">Aria Sterling</span>
+                    <h4 class="caption-title">Planos en Colisión (2025)</h4>
+                  </div>
+                </div>
+                <!-- Slide 6 -->
+                <div class="home-slide" data-index="5">
+                  <img src="assets/images/pics/obra6.jpg" onerror="this.onerror=null; this.src='https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?auto=format&fit=crop&w=1200&q=80'" alt="Perfil en Eclipse" loading="lazy">
+                  <div class="slide-caption glass-caption">
+                    <span class="caption-artist">Mateo Rivas</span>
+                    <h4 class="caption-title">Perfil en Eclipse (2024)</h4>
+                  </div>
+                </div>
               </div>
             </div>
           </div>
@@ -599,12 +604,12 @@
           </div>
           <div class="heading-right">
             <p class="section-lead-text">
-              <strong>Luz &amp; Sonido:</strong> Camina virtualmente por la sala de la galería. Mueve el cursor para girar la perspectiva alrededor de la instalación lumínica central. Tu proximidad modula el sintetizador espacial en tiempo real.
+              <strong>Luz &amp; Sonido:</strong> Recorre virtualmente la sala como en un videojuego 3D en primera persona. Mueve el ratón para mirar en cualquier dirección en 360°, usa la rueda o clic para caminar y acércate a las instalaciones reactivas.
             </p>
             <div class="ls-tips-row">
-              <span class="tip-tag">🖱 Mover mouse: Girar vista</span>
-              <span class="tip-tag">⌨ W / A / S / D o Flechas: Caminar en el espacio</span>
-              <span class="tip-tag">🎛 Controles de Iluminación abajo</span>
+              <span class="tip-tag">🖱 Mouse 360°: Mirar / Apuntar</span>
+              <span class="tip-tag">📜 Rueda / Clic: Avanzar y retroceder</span>
+              <span class="tip-tag">⌨ W / A / S / D: Caminar en el espacio</span>
             </div>
           </div>
         </div>
@@ -631,6 +636,23 @@
             <!-- Canvas 3D que renderiza la perspectiva arquitectónica, muros, luces y la escultura central -->
             <canvas id="virtualRoomCanvas" width="1000" height="650"></canvas>
 
+            <!-- Retícula / Mira central estilo videojuego 3D -->
+            <div class="fps-crosshair" id="fpsCrosshair">
+              <div class="crosshair-dot"></div>
+              <div class="crosshair-lines"></div>
+            </div>
+
+            <!-- Mini Radar / Mapa en tiempo real -->
+            <div class="room-minimap-radar" id="roomMinimapRadar">
+              <canvas id="minimapCanvas" width="80" height="80"></canvas>
+              <span class="radar-label">MAPA 3D</span>
+            </div>
+
+            <!-- Botón de Modo Videojuego / Fijación de Cursor -->
+            <button class="btn-fps-mode glass-btn" id="btnFpsMode">
+              <span class="game-icon">🎮</span> MODO VIDEOJUEGO 3D (CLIC PARA ACTIVAR)
+            </button>
+
             <!-- Hotspots o puntos de información dentro del espacio -->
             <div class="room-hotspot" id="hotspotCenter" style="top: 50%; left: 50%;">
               <div class="hotspot-pulse"></div>
@@ -651,7 +673,7 @@
             </div>
 
             <div class="walk-hint-box" id="walkHintBox">
-              <span>Haz clic y arrastra para orbitar el espacio // Pulsa W, S para acercarte o alejarte</span>
+              <span>🕹 <strong>MODO VIDEOJUEGO 3D:</strong> Mueve el mouse para girar la cámara · Rueda o Clic para avanzar · Teclas W/A/S/D · Pulsa ESC para liberar mouse</span>
             </div>
           </div>
 
