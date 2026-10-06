@@ -816,11 +816,12 @@ document.addEventListener('DOMContentLoaded', () => {
   }
 
   /* ══════════════════════════════════════════════════════════════
-     9. SECCIÓN L&S: SALA INMERSIVA COMPLETA
-        - Botón de pantalla completa
-        - Animación de "vuelo de entrada" a la sala
-        - Piso de vidrio oscuro con partículas flotantes
-        - Pantallas laterales interactivas (partículas + ondas + luz)
+     9. SECCIÓN L&S: SALA INMERSIVA COMPLETA (PENUMBRA & LUZ)
+        - Propuesta de Penumbra y Luz suave (luz atenuada por defecto)
+        - Pantallas interactivas laterales con cambio de estado al mouse
+        - Generador de Ondas Visuales (ripples) reactivo al movimiento del ratón
+        - Puerta de salida visible en la estructura 3D + HUD
+        - Compatibilidad completa con Pantalla Completa
      ══════════════════════════════════════════════════════════════ */
   const roomCanvas   = document.getElementById('virtualRoomCanvas');
   const lsSection    = document.getElementById('ls');
@@ -833,44 +834,46 @@ document.addEventListener('DOMContentLoaded', () => {
   const synthPulse   = document.getElementById('synthPulse');
   const synthStatus  = document.getElementById('synthStatusText');
   const hotspot      = document.getElementById('hotspotCenter');
+  const hotspotExit  = document.getElementById('hotspotExit');
   const btnFpsMode   = document.getElementById('btnFpsMode');
   const fpsCrosshair = document.getElementById('fpsCrosshair');
   const minimapCanvas= document.getElementById('minimapCanvas');
+  const roomCard     = document.getElementById('virtualRoomCard');
 
-  // ── Botón de Pantalla Completa ─────────────────────────────
-  const roomCard = document.getElementById('virtualRoomCard');
+  // ── Botones de Pantalla Completa y Puerta de Salida en el HUD ───────
+  let fsBtn = null;
+  let exitBtn = null;
+
   if (roomCard) {
-    const fsBtn = document.createElement('button');
-    fsBtn.id = 'lsFullscreenBtn';
-    fsBtn.className = 'tool-btn ls-fullscreen-btn';
-    fsBtn.innerHTML = '<span class="tool-icon">⤢</span><span>PANTALLA COMPLETA</span>';
     const hud = roomCard.querySelector('.room-hud-bar');
-    if (hud) hud.appendChild(fsBtn);
+    if (hud) {
+      // Contenedor de acciones HUD
+      const actionsGroup = document.createElement('div');
+      actionsGroup.className = 'ls-hud-actions';
 
-    fsBtn.addEventListener('click', () => {
-      if (!document.fullscreenElement) {
-        roomCard.requestFullscreen().catch(err => console.warn(err));
-        fsBtn.innerHTML = '<span class="tool-icon">⤡</span><span>SALIR PANTALLA COMPLETA</span>';
-      } else {
-        document.exitFullscreen();
-        fsBtn.innerHTML = '<span class="tool-icon">⤢</span><span>PANTALLA COMPLETA</span>';
-      }
-    });
-    document.addEventListener('fullscreenchange', () => {
-      if (!document.fullscreenElement) {
-        fsBtn.innerHTML = '<span class="tool-icon">⤢</span><span>PANTALLA COMPLETA</span>';
-        if (roomCanvas) { roomCanvas.width = roomCanvas.parentElement.clientWidth; roomCanvas.height = roomCanvas.parentElement.clientHeight; }
-      } else {
-        if (roomCanvas) { roomCanvas.width = window.innerWidth; roomCanvas.height = window.innerHeight; }
-      }
-    });
+      // Botón Puerta de Salida HUD
+      exitBtn = document.createElement('button');
+      exitBtn.id = 'lsExitDoorBtn';
+      exitBtn.className = 'tool-btn ls-exit-door-btn';
+      exitBtn.innerHTML = '<span class="tool-icon">🚪</span><span>PUERTA DE SALIDA</span>';
+      actionsGroup.appendChild(exitBtn);
+
+      // Botón Pantalla Completa
+      fsBtn = document.createElement('button');
+      fsBtn.id = 'lsFullscreenBtn';
+      fsBtn.className = 'tool-btn ls-fullscreen-btn';
+      fsBtn.innerHTML = '<span class="tool-icon">⤢</span><span>PANTALLA COMPLETA</span>';
+      actionsGroup.appendChild(fsBtn);
+
+      hud.appendChild(actionsGroup);
+    }
   }
 
   if (roomCanvas) {
     const ctx = roomCanvas.getContext('2d');
     const miniCtx = minimapCanvas ? minimapCanvas.getContext('2d') : null;
 
-    // ── Estado de la cámara y física tipo videojuego 3D ────────
+    // ── Estado de la cámara y física 3D ─────────────────────
     const camera = {
       x: 0,
       y: 0,
@@ -889,43 +892,146 @@ document.addEventListener('DOMContentLoaded', () => {
     let mouseDownWalk = false;
     let mouseBackWalk = false;
     let lookMode = false, lastMX = 0, lastMY = 0;
-    let lightVal = 0.6, lightMode = 'pure-white', roomSound = false;
+    let lightVal = 0.35, lightMode = 'pure-white', roomSound = false; // Luz más suave por defecto (0.35)
     let walkStepCycle = 0;
+
+    // ── Coordenadas del ratón en la sala ────────────────────
+    let currentMouseX = roomCanvas.width / 2;
+    let currentMouseY = roomCanvas.height / 2;
+
+    // ── Sistema de Ondas Visuales (Ripples) en la Sala ───────
+    const roomRipples = [];
+    let lastRippleTime = 0;
+
+    function addRoomRipple(x, y, maxR = 120, color = 'rgba(180,220,255,') {
+      roomRipples.push({
+        x, y,
+        r: 0,
+        maxR: maxR,
+        alpha: 0.75,
+        speed: 2.2 + Math.random() * 0.8,
+        color
+      });
+      if (roomRipples.length > 25) roomRipples.shift();
+    }
+
+    // ── Función para Salir de la Sala / Pantalla Completa ────
+    function exitGalleryRoom() {
+      if (document.fullscreenElement) {
+        document.exitFullscreen().catch(err => console.warn(err));
+      }
+      if (document.pointerLockElement) {
+        document.exitPointerLock();
+      }
+      camera.x = 0;
+      camera.z = 5.0;
+      camera.targetYaw = 0;
+      camera.targetPitch = 0.05;
+      if (galleryAudio) galleryAudio.playGlintChime(260);
+      showToast('🚪 Puerta de Salida: Has egresado de la Sala L&S');
+    }
+
+    if (exitBtn) exitBtn.addEventListener('click', exitGalleryRoom);
+    if (hotspotExit) hotspotExit.addEventListener('click', exitGalleryRoom);
+
+    // Gestor de Pantalla Completa
+    if (fsBtn) {
+      fsBtn.addEventListener('click', () => {
+        if (!document.fullscreenElement) {
+          roomCard.requestFullscreen().catch(err => console.warn(err));
+        } else {
+          document.exitFullscreen();
+        }
+      });
+    }
+
+    document.addEventListener('fullscreenchange', () => {
+      const isFS = !!document.fullscreenElement;
+      if (fsBtn) {
+        fsBtn.innerHTML = isFS ?
+          '<span class="tool-icon">⤡</span><span>SALIR PANTALLA COMPLETA</span>' :
+          '<span class="tool-icon">⤢</span><span>PANTALLA COMPLETA</span>';
+      }
+      if (roomCanvas) {
+        roomCanvas.width  = isFS ? window.innerWidth : roomCanvas.parentElement.clientWidth;
+        roomCanvas.height = isFS ? window.innerHeight : roomCanvas.parentElement.clientHeight;
+      }
+    });
 
     // ── Animación de entrada: "vuelo" de z=8 a z=3.5 ────────
     let flyIn = true, flyProgress = 0;
-    const FLY_DURATION = 2000; // ms
+    const FLY_DURATION = 2000;
     let flyStart = null;
 
-    // ── Partículas ambientales flotantes en el espacio 3D ────
-    const spaceParticles = Array.from({ length: 70 }, () => ({
+    // ── Partículas ambientales flotantes en penumbra ────────
+    const spaceParticles = Array.from({ length: 80 }, () => ({
       x: (Math.random() - 0.5) * 8.5,
       y: -2.0 + Math.random() * 3.2,
       z: (Math.random() - 0.5) * 11,
-      vx: (Math.random() - 0.5) * 0.002,
-      vy: (Math.random() - 0.5) * 0.0015,
-      vz: (Math.random() - 0.5) * 0.002,
-      size: Math.random() * 0.035 + 0.015,
-      alpha: Math.random() * 0.6 + 0.2,
+      vx: (Math.random() - 0.5) * 0.0018,
+      vy: (Math.random() - 0.5) * 0.0012,
+      vz: (Math.random() - 0.5) * 0.0018,
+      size: Math.random() * 0.035 + 0.012,
+      alpha: Math.random() * 0.5 + 0.15,
       phase: Math.random() * Math.PI * 2
     }));
 
-    // ── Pantallas laterales interactivas ─────────────────────
+    // ── Pantallas interactivas digitales en las paredes ──────
     const screens = [
-      { wx: -4.3, wz: 0.0,  width: 2.6, height: 1.6, particles: [], waves: [], lastTouch: 0, hovered: false, title: 'FRECUENCIAS SÓNICAS 01' },
-      { wx:  4.3, wz: 0.0,  width: 2.6, height: 1.6, particles: [], waves: [], lastTouch: 0, hovered: false, title: 'ONDAS DE LUZ REACTIVAS 02' }
+      {
+        id: 'screenA',
+        wx: -4.3, wy: -0.2, wz: -0.5,
+        width: 2.6, height: 1.6,
+        particles: [], waves: [],
+        hovered: false, hoverProgress: 0,
+        mouseRelX: 0.5, mouseRelY: 0.5,
+        lastTouch: 0,
+        title: 'PANTALLA A: OSCILADOR DE PENUMBRA',
+        subtitle: 'ESTADO: SENSORES EN LÍNEA'
+      },
+      {
+        id: 'screenB',
+        wx: 4.3, wy: -0.2, wz: -0.5,
+        width: 2.6, height: 1.6,
+        particles: [], waves: [],
+        hovered: false, hoverProgress: 0,
+        mouseRelX: 0.5, mouseRelY: 0.5,
+        lastTouch: 0,
+        title: 'PANTALLA B: MATRIZ DE ONDAS REACTIVAS',
+        subtitle: 'ESTADO: SENSORES EN LÍNEA'
+      },
+      {
+        id: 'screenC',
+        wx: -2.8, wy: -0.2, wz: -5.3,
+        width: 2.2, height: 1.4,
+        particles: [], waves: [],
+        hovered: false, hoverProgress: 0,
+        mouseRelX: 0.5, mouseRelY: 0.5,
+        lastTouch: 0,
+        title: 'PANTALLA C: CAMPOS DE RESONANCIA',
+        subtitle: 'ESTADO: SENSORES EN LÍNEA'
+      }
     ];
+
     screens.forEach(sc => {
-      sc.particles = Array.from({ length: 22 }, () => ({
-        x: Math.random(), y: Math.random(), vx: (Math.random()-0.5)*0.008, vy: (Math.random()-0.5)*0.008,
-        r: Math.random()*0.04+0.02, a: 0, target_a: 0
+      sc.particles = Array.from({ length: 26 }, () => ({
+        x: Math.random(), y: Math.random(),
+        vx: (Math.random() - 0.5) * 0.006,
+        vy: (Math.random() - 0.5) * 0.006,
+        r: Math.random() * 0.035 + 0.015,
+        a: 0.2, target_a: 0.2
       }));
     });
 
     // ── Resize ────────────────────────────────────────────────
     function resizeRoom() {
-      roomCanvas.width  = roomCanvas.parentElement.clientWidth;
-      roomCanvas.height = roomCanvas.parentElement.clientHeight;
+      if (document.fullscreenElement) {
+        roomCanvas.width  = window.innerWidth;
+        roomCanvas.height = window.innerHeight;
+      } else {
+        roomCanvas.width  = roomCanvas.parentElement.clientWidth;
+        roomCanvas.height = roomCanvas.parentElement.clientHeight;
+      }
     }
     resizeRoom();
     window.addEventListener('resize', resizeRoom);
@@ -950,17 +1056,15 @@ document.addEventListener('DOMContentLoaded', () => {
       return { x: roomCanvas.width / 2 + x1 * sc, y: roomCanvas.height / 2 + y2 * sc, sc, depth: z2 };
     }
 
-    // ── Renderizado del Radar / Minimap ──────────────────────
+    // ── Renderizado del Radar / Minimap 3D ────────────────────
     function drawMinimap() {
       if (!miniCtx || !minimapCanvas) return;
       const mw = minimapCanvas.width, mh = minimapCanvas.height;
       miniCtx.clearRect(0, 0, mw, mh);
 
-      // Fondo del radar
       miniCtx.fillStyle = '#06080d';
       miniCtx.fillRect(0, 0, mw, mh);
 
-      // Grilla del radar
       miniCtx.strokeStyle = 'rgba(255,255,255,0.08)';
       miniCtx.lineWidth = 1;
       miniCtx.strokeRect(4, 4, mw - 8, mh - 8);
@@ -969,28 +1073,32 @@ document.addEventListener('DOMContentLoaded', () => {
       miniCtx.moveTo(4, mh/2); miniCtx.lineTo(mw-4, mh/2);
       miniCtx.stroke();
 
-      // Mapear coordenadas 3D (-4.5 a 4.5 en X, -5.5 a 5.5 en Z) al minimap
       const toMx = (x) => mw/2 + (x / 5.2) * (mw/2 - 8);
       const toMz = (z) => mh/2 + (z / 6.0) * (mh/2 - 8);
 
       // Escultura central
-      miniCtx.fillStyle = 'rgba(255,255,255,0.4)';
+      miniCtx.fillStyle = 'rgba(255,255,255,0.35)';
       miniCtx.beginPath();
       miniCtx.arc(toMx(0), toMz(0), 4, 0, Math.PI * 2);
       miniCtx.fill();
 
-      // Pantallas laterales
-      miniCtx.fillStyle = 'rgba(120,180,255,0.7)';
-      miniCtx.fillRect(toMx(-4.3) - 2, toMz(0) - 6, 4, 12);
-      miniCtx.fillRect(toMx(4.3) - 2, toMz(0) - 6, 4, 12);
+      // Pantallas interactivas
+      miniCtx.fillStyle = 'rgba(120,200,255,0.85)';
+      miniCtx.fillRect(toMx(-4.3) - 2, toMz(-0.5) - 5, 4, 10);
+      miniCtx.fillRect(toMx(4.3) - 2, toMz(-0.5) - 5, 4, 10);
+      miniCtx.fillRect(toMx(-2.8) - 4, toMz(-5.3) - 2, 8, 4);
+
+      // Icono de Puerta de Salida en la pared trasera
+      miniCtx.fillStyle = '#64ffda';
+      miniCtx.fillRect(toMx(0) - 5, toMz(-5.45) - 2, 10, 3);
 
       // Cono de visión del jugador
       const px = toMx(camera.x), pz = toMz(camera.z);
-      const viewLen = 14;
+      const viewLen = 13;
       const leftAngle = camera.yaw - 0.45;
       const rightAngle = camera.yaw + 0.45;
 
-      miniCtx.fillStyle = 'rgba(255,255,255,0.18)';
+      miniCtx.fillStyle = 'rgba(255,255,255,0.15)';
       miniCtx.beginPath();
       miniCtx.moveTo(px, pz);
       miniCtx.lineTo(px - Math.sin(leftAngle) * viewLen, pz - Math.cos(leftAngle) * viewLen);
@@ -1000,15 +1108,12 @@ document.addEventListener('DOMContentLoaded', () => {
 
       // Punto del jugador
       miniCtx.fillStyle = '#ffffff';
-      miniCtx.shadowColor = '#ffffff';
-      miniCtx.shadowBlur = 6;
       miniCtx.beginPath();
       miniCtx.arc(px, pz, 3, 0, Math.PI * 2);
       miniCtx.fill();
-      miniCtx.shadowBlur = 0;
     }
 
-    // ── Teclado WASD / Flechas / Shift (Sprint) ────────────────
+    // ── Teclado WASD / Flechas / Shift ────────────────────────
     const keys = {};
     window.addEventListener('keydown', e => {
       const aEl = document.activeElement;
@@ -1025,21 +1130,21 @@ document.addEventListener('DOMContentLoaded', () => {
       ctx.clearRect(0, 0, W, H);
       const t = ts * 0.001;
 
-      // — Animación de entrada (fly-in suave) —
+      // — Animación de entrada suave —
       if (flyIn) {
         if (!flyStart) flyStart = ts;
         flyProgress = Math.min(1, (ts - flyStart) / FLY_DURATION);
         const ease = 1 - Math.pow(1 - flyProgress, 3);
-        camera.z = 8 - ease * 4.5; // z: 8 → 3.5
+        camera.z = 8 - ease * 4.5;
         camera.pitch = 0.05 + Math.sin(flyProgress * Math.PI) * 0.08;
         if (flyProgress >= 1) { flyIn = false; camera.z = 3.5; camera.pitch = 0.05; }
       }
 
-      // — Interpolación suave de cámara (Yaw & Pitch) —
+      // — Interpolación de cámara —
       camera.yaw += (camera.targetYaw - camera.yaw) * 0.25;
       camera.pitch += (camera.targetPitch - camera.pitch) * 0.25;
 
-      // — Movimiento y física del jugador (Videojuego FPS) —
+      // — Movimiento y física del jugador —
       const isSprinting = keys['shift'];
       const moveSpeed = (isSprinting ? 0.09 : 0.052);
       const cy2 = Math.cos(camera.yaw), sy = Math.sin(camera.yaw);
@@ -1063,26 +1168,24 @@ document.addEventListener('DOMContentLoaded', () => {
         camera.headBob *= 0.8;
       }
 
-      // Inercia y fricción
       camera.x += camera.vx;
       camera.z += camera.vz;
       camera.vx *= 0.72;
       camera.vz *= 0.72;
 
-      // Colisiones con los muros de la galería
+      // Colisiones de la sala
       camera.x = Math.max(-3.8, Math.min(3.8, camera.x));
       camera.z = Math.max(-4.4, Math.min(5.2, camera.z));
 
-      // — Fondo & Iluminación Ambiental de la Sala —
+      // — Fondo de Penumbra de la Sala —
       let ambR, ambG, ambB;
-      if (lightMode === 'warm-noir')       { ambR=34; ambG=30; ambB=28; }
-      else if (lightMode === 'deep-contrast') { ambR=8;  ambG=8;  ambB=8;  }
-      else                                  { ambR=18; ambG=20; ambB=26; }
+      if (lightMode === 'warm-noir')          { ambR=24; ambG=22; ambB=20; }
+      else if (lightMode === 'deep-contrast') { ambR=6;  ambG=6;  ambB=8;  }
+      else                                     { ambR=12; ambG=14; ambB=20; }
       ctx.fillStyle = `rgb(${ambR},${ambG},${ambB})`;
       ctx.fillRect(0, 0, W, H);
 
-      // — PAREDES ARQUITECTÓNICAS DE LA SALA EN 3D —
-      // Pared trasera (z = -5.5)
+      // — PAREDES EN PERSPECTIVA 3D —
       const pBackTL = project3D(-4.5, -2.4, -5.5);
       const pBackTR = project3D( 4.5, -2.4, -5.5);
       const pBackBR = project3D( 4.5,  1.2, -5.5);
@@ -1096,48 +1199,98 @@ document.addEventListener('DOMContentLoaded', () => {
         ctx.lineTo(pBackBL.x, pBackBL.y);
         ctx.closePath();
         const wallGrad = ctx.createLinearGradient(0, pBackTL.y, 0, pBackBL.y);
-        wallGrad.addColorStop(0, `rgba(12, 14, 18, 0.95)`);
-        wallGrad.addColorStop(1, `rgba(5, 6, 8, 0.98)`);
+        wallGrad.addColorStop(0, `rgba(10, 12, 16, 0.96)`);
+        wallGrad.addColorStop(1, `rgba(4, 5, 8, 0.98)`);
         ctx.fillStyle = wallGrad;
         ctx.fill();
+      }
 
-        // Estructura monolítica luminosa en la pared trasera
-        const pMonoTL = project3D(-1.2, -2.0, -5.4);
-        const pMonoTR = project3D( 1.2, -2.0, -5.4);
-        const pMonoBR = project3D( 1.2,  0.8, -5.4);
-        const pMonoBL = project3D(-1.2,  0.8, -5.4);
-        if (pMonoTL && pMonoTR && pMonoBR && pMonoBL) {
+      // — ESTRUCTURA 3D DE LA PUERTA DE SALIDA (PARED TRASERA) ─────
+      // Ubicación en 3D: x: 0.0, y: 0.1 (centro), z: -5.45
+      const doorW = 1.3, doorH = 2.1;
+      const dTL = project3D(-doorW/2, -doorH/2 + 0.15, -5.45);
+      const dTR = project3D( doorW/2, -doorH/2 + 0.15, -5.45);
+      const dBR = project3D( doorW/2,  1.18,           -5.45);
+      const dBL = project3D(-doorW/2,  1.18,           -5.45);
+
+      let isDoorCurrentlyHovered = false;
+
+      if (dTL && dTR && dBR && dBL) {
+        // Distancia a la puerta y comprobación estricta de Hover
+        const minDx = Math.min(dTL.x, dBL.x), maxDx = Math.max(dTR.x, dBR.x);
+        const minDy = Math.min(dTL.y, dTR.y), maxDy = Math.max(dBL.y, dBR.y);
+
+        const isMouseInDoorPoly = (currentMouseX >= minDx && currentMouseX <= maxDx &&
+                                   currentMouseY >= minDy && currentMouseY <= maxDy);
+
+        isDoorCurrentlyHovered = isMouseInDoorPoly && (camera.z > 1.8) && !screens.some(s => s.hovered);
+
+        // Marco exterior de la puerta
+        ctx.beginPath();
+        ctx.moveTo(dTL.x, dTL.y);
+        ctx.lineTo(dTR.x, dTR.y);
+        ctx.lineTo(dBR.x, dBR.y);
+        ctx.lineTo(dBL.x, dBL.y);
+        ctx.closePath();
+
+        const doorGrad = ctx.createLinearGradient(dTL.x, dTL.y, dBR.x, dBR.y);
+        doorGrad.addColorStop(0, isDoorCurrentlyHovered ? 'rgba(28, 45, 60, 0.95)' : 'rgba(14, 18, 26, 0.85)');
+        doorGrad.addColorStop(1, isDoorCurrentlyHovered ? 'rgba(16, 30, 44, 0.98)' : 'rgba(8, 10, 15, 0.9)');
+        ctx.fillStyle = doorGrad;
+        ctx.fill();
+
+        ctx.strokeStyle = isDoorCurrentlyHovered ? '#64ffda' : 'rgba(180, 220, 255, 0.35)';
+        ctx.lineWidth = isDoorCurrentlyHovered ? 2.0 : 1.2;
+        ctx.stroke();
+
+        // Paneles de vidrio y línea divisoria central
+        const dMidTop = project3D(0, -doorH/2 + 0.15, -5.45);
+        const dMidBot = project3D(0,  1.18,           -5.45);
+        if (dMidTop && dMidBot) {
           ctx.beginPath();
-          ctx.moveTo(pMonoTL.x, pMonoTL.y);
-          ctx.lineTo(pMonoTR.x, pMonoTR.y);
-          ctx.lineTo(pMonoBR.x, pMonoBR.y);
-          ctx.lineTo(pMonoBL.x, pMonoBL.y);
-          ctx.closePath();
-          ctx.fillStyle = `rgba(18, 22, 32, 0.8)`;
-          ctx.fill();
-          ctx.strokeStyle = `rgba(255, 255, 255, ${0.15 + 0.1 * Math.sin(t)})`;
-          ctx.lineWidth = 1.2;
+          ctx.moveTo(dMidTop.x, dMidTop.y);
+          ctx.lineTo(dMidBot.x, dMidBot.y);
+          ctx.strokeStyle = 'rgba(255, 255, 255, 0.25)';
+          ctx.lineWidth = 1;
           ctx.stroke();
+        }
+
+        // Tiradores metálicos de la puerta
+        const handleL = project3D(-0.08, 0.2, -5.44);
+        const handleR = project3D( 0.08, 0.2, -5.44);
+        if (handleL && handleR) {
+          ctx.fillStyle = '#ffffff';
+          ctx.fillRect(handleL.x - 1, handleL.y - 8, 2, 16);
+          ctx.fillRect(handleR.x,     handleR.y - 8, 2, 16);
+        }
+
+        // Indicador LED sutil sobre el marco de la puerta (sin texto en canvas)
+        const dLed = project3D(0, -doorH/2 + 0.08, -5.44);
+        if (dLed) {
+          ctx.fillStyle = isDoorCurrentlyHovered ? '#64ffda' : 'rgba(100, 255, 218, 0.6)';
+          ctx.beginPath();
+          ctx.arc(dLed.x, dLed.y, Math.max(2, 3 * dLed.sc), 0, Math.PI * 2);
+          ctx.fill();
         }
       }
 
-      // — TECHO CON RIELES Y LUCES —
-      const ceilingAlpha = 0.08 * lightVal;
-      ctx.strokeStyle = `rgba(200, 220, 255, ${ceilingAlpha})`;
+      // — TECHO Y ILUMINACIÓN DE PENUMBRA —
+      const ceilingAlpha = 0.06 * lightVal;
+      ctx.strokeStyle = `rgba(180, 210, 255, ${ceilingAlpha})`;
       ctx.lineWidth = 1;
       for (let cx = -4; cx <= 4; cx += 2) {
         const cA = project3D(cx, -2.3, -5.5), cB = project3D(cx, -2.3, 5.5);
         if (cA && cB) { ctx.beginPath(); ctx.moveTo(cA.x, cA.y); ctx.lineTo(cB.x, cB.y); ctx.stroke(); }
       }
 
-      // — HAZ DE LUZ CENITAL VOLUMÉTRICO —
+      // — HAZ DE LUZ ATENUADO EN PENUMBRA —
       const spotApex = project3D(0, -3.2, 0);
       const spotB1   = project3D(-1.5, 1.15, -1.5);
       const spotB2   = project3D( 1.5, 1.15,  1.5);
       if (spotApex && spotB1 && spotB2) {
         const sg = ctx.createLinearGradient(spotApex.x, spotApex.y, (spotB1.x+spotB2.x)/2, (spotB1.y+spotB2.y)/2);
-        sg.addColorStop(0, `rgba(255,255,255,${0.55 * lightVal})`);
-        sg.addColorStop(0.5, `rgba(240,245,255,${0.2 * lightVal})`);
+        sg.addColorStop(0, `rgba(255,255,255,${0.35 * lightVal})`);
+        sg.addColorStop(0.6, `rgba(180,210,255,${0.12 * lightVal})`);
         sg.addColorStop(1, 'rgba(255,255,255,0)');
         ctx.fillStyle = sg;
         ctx.beginPath();
@@ -1148,9 +1301,9 @@ document.addEventListener('DOMContentLoaded', () => {
         ctx.fill();
       }
 
-      // — PISO DE MÁRMOL OSCURO CON REFLEJOS —
-      const floorAlpha = 0.14 * lightVal;
-      ctx.strokeStyle = `rgba(170, 200, 255, ${floorAlpha})`;
+      // — PISO DE VIDRIO OSCURO Y MÁRMOL —
+      const floorAlpha = 0.12 * lightVal;
+      ctx.strokeStyle = `rgba(140, 180, 255, ${floorAlpha})`;
       ctx.lineWidth = 1;
       for (let gx = -5; gx <= 5; gx += 1) {
         const pA = project3D(gx, 1.2, -5.5), pB = project3D(gx, 1.2, 5.5);
@@ -1161,72 +1314,123 @@ document.addEventListener('DOMContentLoaded', () => {
         if (pA && pB) { ctx.beginPath(); ctx.moveTo(pA.x, pA.y); ctx.lineTo(pB.x, pB.y); ctx.stroke(); }
       }
 
-      // Reflejo especular en el centro del piso
+      // Reflejo central en el piso
       const floorCenter = project3D(0, 1.19, 0);
       if (floorCenter) {
-        const fg = ctx.createRadialGradient(floorCenter.x, floorCenter.y, 0, floorCenter.x, floorCenter.y, 180 * floorCenter.sc);
-        fg.addColorStop(0, `rgba(210,230,255,${0.25 * lightVal + 0.05 * Math.sin(t * 1.8)})`);
-        fg.addColorStop(0.6, `rgba(180,210,255,${0.08 * lightVal})`);
-        fg.addColorStop(1, 'rgba(180,210,255,0)');
+        const fg = ctx.createRadialGradient(floorCenter.x, floorCenter.y, 0, floorCenter.x, floorCenter.y, 160 * floorCenter.sc);
+        fg.addColorStop(0, `rgba(180,210,255,${0.18 * lightVal + 0.04 * Math.sin(t * 1.8)})`);
+        fg.addColorStop(0.7, `rgba(140,180,255,${0.05 * lightVal})`);
+        fg.addColorStop(1, 'rgba(140,180,255,0)');
         ctx.fillStyle = fg;
         ctx.beginPath();
-        ctx.ellipse(floorCenter.x, floorCenter.y, 220 * floorCenter.sc, 70 * floorCenter.sc, 0, 0, Math.PI * 2);
+        ctx.ellipse(floorCenter.x, floorCenter.y, 200 * floorCenter.sc, 65 * floorCenter.sc, 0, 0, Math.PI * 2);
         ctx.fill();
       }
 
-      // Partículas y motes de luz flotando en 3D
+      // — RENDERING DE ONDAS VISUALES EN LA SALA (RIPPLES DEL MOUSE) ──
+      for (let i = roomRipples.length - 1; i >= 0; i--) {
+        const rip = roomRipples[i];
+        rip.r += rip.speed;
+        rip.alpha *= 0.945;
+
+        if (rip.r >= rip.maxR || rip.alpha <= 0.01) {
+          roomRipples.splice(i, 1);
+          continue;
+        }
+
+        ctx.strokeStyle = `${rip.color}${rip.alpha})`;
+        ctx.lineWidth = 1.6;
+        ctx.beginPath();
+        ctx.arc(rip.x, rip.y, rip.r, 0, Math.PI * 2);
+        ctx.stroke();
+
+        // Segunda onda secundaria
+        if (rip.r > 15) {
+          ctx.strokeStyle = `${rip.color}${rip.alpha * 0.5})`;
+          ctx.lineWidth = 0.9;
+          ctx.beginPath();
+          ctx.arc(rip.x, rip.y, rip.r * 0.65, 0, Math.PI * 2);
+          ctx.stroke();
+        }
+      }
+
+      // Partículas ambientales en penumbra
       spaceParticles.forEach(p => {
         p.x += p.vx; p.y += p.vy; p.z += p.vz;
         if (p.x > 4.2) p.x = -4.2; if (p.x < -4.2) p.x = 4.2;
         if (p.y > 1.2) p.y = -2.0; if (p.y < -2.0) p.y = 1.2;
         if (p.z > 5.4) p.z = -5.4; if (p.z < -5.4) p.z = 5.4;
 
-        const glimmer = 0.4 + 0.6 * Math.sin(t * 2 + p.phase);
+        const glimmer = 0.35 + 0.65 * Math.sin(t * 2 + p.phase);
         const pp = project3D(p.x, p.y, p.z);
         if (!pp) return;
         const pr = Math.max(1, p.size * pp.sc * 14);
-        ctx.fillStyle = `rgba(180, 210, 255, ${p.alpha * glimmer * lightVal})`;
+        ctx.fillStyle = `rgba(180, 215, 255, ${p.alpha * glimmer * lightVal})`;
         ctx.beginPath();
         ctx.arc(pp.x, pp.y, pr, 0, Math.PI * 2);
         ctx.fill();
       });
 
-      // — PANTALLAS LATERALES INTERACTIVAS —
+      // — PANTALLAS DIGITALES INTERACTIVAS CON ONDAS VISUALES —
       screens.forEach(sc => {
         const hw = sc.width / 2, hh = sc.height / 2;
         const corners = [
-          project3D(sc.wx, -hh - 0.2, sc.wz - hw),
-          project3D(sc.wx, -hh - 0.2, sc.wz + hw),
-          project3D(sc.wx,  hh - 0.2, sc.wz + hw),
-          project3D(sc.wx,  hh - 0.2, sc.wz - hw)
+          project3D(sc.wx, sc.wy - hh, sc.wz - (sc.wx < 0 ? 0 : hw)),
+          project3D(sc.wx, sc.wy - hh, sc.wz + (sc.wx < 0 ? hw : 0)),
+          project3D(sc.wx, sc.wy + hh, sc.wz + (sc.wx < 0 ? hw : 0)),
+          project3D(sc.wx, sc.wy + hh, sc.wz - (sc.wx < 0 ? 0 : hw))
         ].filter(Boolean);
+
+        if (sc.id === 'screenC') {
+          // Pantalla trasera plana
+          const cornersC = [
+            project3D(sc.wx - hw, sc.wy - hh, sc.wz),
+            project3D(sc.wx + hw, sc.wy - hh, sc.wz),
+            project3D(sc.wx + hw, sc.wy + hh, sc.wz),
+            project3D(sc.wx - hw, sc.wy + hh, sc.wz)
+          ].filter(Boolean);
+          if (cornersC.length === 4) corners.splice(0, 4, ...cornersC);
+        }
 
         if (corners.length < 4) return;
 
-        const lastTouchAge = (performance.now() - sc.lastTouch) / 1000;
-        const screenGlow = sc.hovered ? 0.45 : Math.max(0, 1 - lastTouchAge * 0.6) * 0.55;
+        const minX = Math.min(...corners.map(c=>c.x)), maxX = Math.max(...corners.map(c=>c.x));
+        const minY = Math.min(...corners.map(c=>c.y)), maxY = Math.max(...corners.map(c=>c.y));
+        const sw = maxX - minX, sh = maxY - minY;
 
-        // Borde y marco
+        // Detección de Hover / Apuntado del Mouse sobre la pantalla
+        const isHover = (currentMouseX >= minX && currentMouseX <= maxX && currentMouseY >= minY && currentMouseY <= maxY);
+        sc.hovered = isHover;
+        sc.hoverProgress += (isHover ? 1 : 0 - sc.hoverProgress) * 0.15;
+
+        if (isHover) {
+          sc.mouseRelX = (currentMouseX - minX) / sw;
+          sc.mouseRelY = (currentMouseY - minY) / sh;
+
+          // Generar ondas visuales continuas por movimiento de mouse
+          if (ts - sc.lastTouch > 90) {
+            sc.waves.push({ cx: sc.mouseRelX, cy: sc.mouseRelY, r: 0, alpha: 0.95 });
+            sc.lastTouch = ts;
+          }
+        }
+
+        // Borde y Fondo de la Pantalla
         ctx.beginPath();
         ctx.moveTo(corners[0].x, corners[0].y);
         corners.forEach(c => ctx.lineTo(c.x, c.y));
         ctx.closePath();
 
         const screenBg = ctx.createLinearGradient(corners[0].x, corners[0].y, corners[2].x, corners[2].y);
-        screenBg.addColorStop(0, `rgba(8,10,18,${0.92 - screenGlow * 0.2})`);
-        screenBg.addColorStop(1, `rgba(12,16,28,${0.88 - screenGlow * 0.1})`);
+        screenBg.addColorStop(0, `rgba(6, 10, 20, ${0.94 - sc.hoverProgress * 0.2})`);
+        screenBg.addColorStop(1, `rgba(12, 22, 40, ${0.9 - sc.hoverProgress * 0.1})`);
         ctx.fillStyle = screenBg;
         ctx.fill();
 
-        ctx.strokeStyle = `rgba(180,210,255,${0.25 + screenGlow * 0.65})`;
-        ctx.lineWidth = 1.8;
+        ctx.strokeStyle = `rgba(180, 225, 255, ${0.3 + sc.hoverProgress * 0.65})`;
+        ctx.lineWidth = 1.5 + sc.hoverProgress * 1.5;
         ctx.stroke();
 
-        // Render interactivo dentro de la pantalla
-        const minX = Math.min(...corners.map(c=>c.x)), maxX = Math.max(...corners.map(c=>c.x));
-        const minY = Math.min(...corners.map(c=>c.y)), maxY = Math.max(...corners.map(c=>c.y));
-        const sw = maxX - minX, sh = maxY - minY;
-
+        // Contenido Dinámico & Ondas dentro de la Pantalla
         ctx.save();
         ctx.beginPath();
         ctx.moveTo(corners[0].x, corners[0].y);
@@ -1234,39 +1438,59 @@ document.addEventListener('DOMContentLoaded', () => {
         ctx.closePath();
         ctx.clip();
 
-        // Partículas reactivas
+        // Partículas reactivas internas
         sc.particles.forEach(p => {
-          p.x += p.vx * (1 + screenGlow * 3);
-          p.y += p.vy * (1 + screenGlow * 3);
+          p.x += p.vx * (1 + sc.hoverProgress * 2.5);
+          p.y += p.vy * (1 + sc.hoverProgress * 2.5);
           if (p.x < 0 || p.x > 1) p.vx *= -1;
           if (p.y < 0 || p.y > 1) p.vy *= -1;
-          p.a = p.a * 0.92 + p.target_a * 0.08;
 
           const px2 = minX + p.x * sw, py2 = minY + p.y * sh;
-          ctx.fillStyle = `rgba(200,225,255,${0.2 + p.a * 0.8})`;
+          ctx.fillStyle = `rgba(190, 230, 255, ${0.15 + sc.hoverProgress * 0.65})`;
           ctx.beginPath();
-          ctx.arc(px2, py2, p.r * corners[0].sc * 18, 0, Math.PI * 2);
+          ctx.arc(px2, py2, Math.max(1, p.r * corners[0].sc * 16), 0, Math.PI * 2);
           ctx.fill();
         });
 
-        // Ondas de choque
+        // Ondas visuales internas expandiéndose (Ripples)
         sc.waves = sc.waves.filter(w => w.alpha > 0.01);
         sc.waves.forEach(w => {
-          w.r += 1.8 * (1 + screenGlow);
-          w.alpha *= 0.94;
+          w.r += 2.2 * (1 + sc.hoverProgress);
+          w.alpha *= 0.93;
           const wox = minX + w.cx * sw, woy = minY + w.cy * sh;
-          ctx.strokeStyle = `rgba(200,230,255,${w.alpha * screenGlow})`;
+          ctx.strokeStyle = `rgba(180, 235, 255, ${w.alpha * (0.4 + sc.hoverProgress * 0.6)})`;
           ctx.lineWidth = 1.4;
           ctx.beginPath();
           ctx.arc(wox, woy, w.r, 0, Math.PI * 2);
           ctx.stroke();
         });
 
+        // Espectro de Ondas Sinusoidales en la pantalla
+        ctx.beginPath();
+        ctx.strokeStyle = `rgba(100, 255, 218, ${0.4 + sc.hoverProgress * 0.5})`;
+        ctx.lineWidth = 1.2;
+        for (let sx = 0; sx <= sw; sx += 4) {
+          const normX = sx / sw;
+          const distToMouse = Math.abs(normX - sc.mouseRelX);
+          const amp = (sh * 0.18) * (1 + (1 - Math.min(1, distToMouse * 3)) * sc.hoverProgress * 2);
+          const sy2 = minY + sh * 0.5 + Math.sin(normX * 12 + t * 4) * amp;
+          if (sx === 0) ctx.moveTo(minX + sx, sy2);
+          else ctx.lineTo(minX + sx, sy2);
+        }
+        ctx.stroke();
+
+        // Texto de Estado en la Pantalla
+        ctx.font = `600 ${Math.max(9, Math.round(10 * corners[0].sc))}px monospace`;
+        ctx.fillStyle = sc.hovered ? '#64ffda' : 'rgba(180, 220, 255, 0.7)';
+        ctx.fillText(sc.title, minX + 12, minY + 20);
+        ctx.fillStyle = sc.hovered ? '#ffffff' : 'rgba(180, 220, 255, 0.4)';
+        ctx.fillText(sc.hovered ? 'ESTADO: [ ONDAS EN CASCADA ]' : sc.subtitle, minX + 12, minY + 36);
+
         ctx.restore();
       });
 
-      // — OBRA CENTRAL: ESCULTURA GIROSCÓPICA LUMÍNICA —
-      const rot2 = t * 0.8;
+      // — OBRA CENTRAL: ESCULTURA DE PENUMBRA Y LUZ —
+      const rot2 = t * 0.75;
       for (let r = 0; r < 5; r++) {
         const ry = -0.35 + (r - 2) * 0.28;
         const rr = 0.48 + Math.sin(t * 1.3 + r) * 0.08;
@@ -1281,19 +1505,19 @@ document.addEventListener('DOMContentLoaded', () => {
           }
         }
         const pulse = 0.5 + 0.45 * Math.sin(t * 2.2 + r);
-        ctx.strokeStyle = r === 2 ? `rgba(255,255,255,${0.75 + pulse * 0.25})` : `rgba(240,245,255,${pulse * 0.6})`;
-        ctx.lineWidth = r === 2 ? 2.4 : 1.2;
+        ctx.strokeStyle = r === 2 ? `rgba(255,255,255,${0.65 + pulse * 0.25})` : `rgba(200,225,255,${pulse * 0.45})`;
+        ctx.lineWidth = r === 2 ? 2.2 : 1.1;
         ctx.stroke();
       }
 
-      // Núcleo central brillante
+      // Núcleo central brillante tenue
       const pCore = project3D(0, -0.35, 0);
       if (pCore) {
         const coreRad = Math.max(3, 14 * pCore.sc);
         const cg = ctx.createRadialGradient(pCore.x, pCore.y, 0, pCore.x, pCore.y, coreRad);
         cg.addColorStop(0, '#ffffff');
-        cg.addColorStop(0.4, 'rgba(210,230,255,0.8)');
-        cg.addColorStop(1, 'rgba(210,230,255,0)');
+        cg.addColorStop(0.4, 'rgba(180,220,255,0.7)');
+        cg.addColorStop(1, 'rgba(180,220,255,0)');
         ctx.fillStyle = cg;
         ctx.beginPath();
         ctx.arc(pCore.x, pCore.y, coreRad, 0, Math.PI * 2);
@@ -1307,7 +1531,7 @@ document.addEventListener('DOMContentLoaded', () => {
         hotspot.style.display = pCore.depth > 0.5 ? 'block' : 'none';
       }
 
-      // Actualizar HUD
+      // Actualizar HUD Coordenadas
       if (coordX) coordX.textContent = camera.x.toFixed(1);
       if (coordZ) coordZ.textContent = camera.z.toFixed(1);
       if (coordAngle) {
@@ -1315,20 +1539,16 @@ document.addEventListener('DOMContentLoaded', () => {
         coordAngle.textContent = `${deg}°`;
       }
 
-      // Modular Audio reactivo
-      const distToCenter = Math.hypot(camera.x, camera.z);
-      if (roomSound) galleryAudio.modulate(distToCenter / 5);
+      if (roomSound) galleryAudio.modulate(Math.hypot(camera.x, camera.z) / 5);
 
-      // Dibujar Radar Minimap
       drawMinimap();
 
       requestAnimationFrame(renderRoom);
     }
     requestAnimationFrame(renderRoom);
 
-    // ── NAVEGACIÓN ESTILO VIDEOJUEGO 3D CON EL MOUSE ─────────
+    // ── INTERACCIÓN CON EL MOUSE EN 3D Y GENERADOR DE ONDAS ────
 
-    // 1. Pointer Lock API (Fijación de Mouse FPS)
     function enterPointerLock() {
       roomCanvas.requestPointerLock = roomCanvas.requestPointerLock || roomCanvas.mozRequestPointerLock;
       if (roomCanvas.requestPointerLock) {
@@ -1358,15 +1578,26 @@ document.addEventListener('DOMContentLoaded', () => {
       roomCanvas.style.cursor = isPointerLocked ? 'none' : 'crosshair';
     }
 
-    // 2. Movimiento del Mouse en 360° (FPS Look o Drag Look)
+    // Movimiento del Mouse: Generar Ondas Visuales y Rotación de Cámara
     window.addEventListener('mousemove', e => {
+      const rect = roomCanvas.getBoundingClientRect();
+      currentMouseX = e.clientX - rect.left;
+      currentMouseY = e.clientY - rect.top;
+
+      // Emitir ondas visuales al mover el ratón sobre el canvas
+      if (currentMouseX >= 0 && currentMouseX <= rect.width && currentMouseY >= 0 && currentMouseY <= rect.height) {
+        const now = performance.now();
+        if (now - lastRippleTime > 80) {
+          addRoomRipple(currentMouseX, currentMouseY, 110, 'rgba(180,220,255,');
+          lastRippleTime = now;
+        }
+      }
+
       if (isPointerLocked) {
-        // En modo videojuego FPS: movimiento directo y fluido
         const sensitivity = 0.0032;
         camera.targetYaw   += e.movementX * sensitivity;
         camera.targetPitch  = Math.max(-0.45, Math.min(0.42, camera.targetPitch + e.movementY * (sensitivity * 0.8)));
       } else if (lookMode) {
-        // Modo arrastre tradicional con el mouse
         const dx = e.clientX - lastMX;
         const dy = e.clientY - lastMY;
         camera.targetYaw   += dx * 0.0055;
@@ -1376,7 +1607,6 @@ document.addEventListener('DOMContentLoaded', () => {
       }
     });
 
-    // 3. Clic / Rueda de ratón para caminar en la sala
     roomCanvas.addEventListener('mousedown', e => {
       if (!isPointerLocked && e.button === 0) {
         lookMode = true;
@@ -1386,9 +1616,14 @@ document.addEventListener('DOMContentLoaded', () => {
       }
 
       if (isPointerLocked) {
-        if (e.button === 0) mouseDownWalk = true; // Clic izquierdo: caminar adelante
-        if (e.button === 2) mouseBackWalk = true; // Clic derecho: caminar atrás
+        if (e.button === 0) mouseDownWalk = true;
+        if (e.button === 2) mouseBackWalk = true;
       }
+
+      // Emitir ráfaga de ondas al hacer clic
+      const rect = roomCanvas.getBoundingClientRect();
+      const mx = e.clientX - rect.left, my = e.clientY - rect.top;
+      addRoomRipple(mx, my, 180, 'rgba(100,255,218,');
     });
 
     window.addEventListener('mouseup', e => {
@@ -1398,7 +1633,6 @@ document.addEventListener('DOMContentLoaded', () => {
       mouseBackWalk = false;
     });
 
-    // Rueda del ratón: avanzar o retroceder de inmediato en la dirección de la mirada
     roomCanvas.addEventListener('wheel', e => {
       e.preventDefault();
       const step = e.deltaY > 0 ? -0.32 : 0.32;
@@ -1407,44 +1641,44 @@ document.addEventListener('DOMContentLoaded', () => {
       camera.vz -= cy2 * step;
     }, { passive: false });
 
-    // Evitar menú contextual con clic derecho sobre la sala 3D
     roomCanvas.addEventListener('contextmenu', e => e.preventDefault());
 
-    // Clic en la sala activa el modo FPS o interactúa con pantallas laterales
+    // Clics interactivos en la Sala 3D
     roomCanvas.addEventListener('click', e => {
-      if (!isPointerLocked) {
-        enterPointerLock();
-      }
-
-      // Detección de clic sobre pantallas interactivas
       const rect = roomCanvas.getBoundingClientRect();
       const mx = e.clientX - rect.left, my = e.clientY - rect.top;
 
+      // Comprobar clic en pantallas interactivas
+      let screenClicked = false;
       screens.forEach(sc => {
-        const hw = sc.width / 2, hh = sc.height / 2;
-        const corners = [
-          project3D(sc.wx, -hh - 0.2, sc.wz - hw),
-          project3D(sc.wx, -hh - 0.2, sc.wz + hw),
-          project3D(sc.wx,  hh - 0.2, sc.wz + hw),
-          project3D(sc.wx,  hh - 0.2, sc.wz - hw)
-        ].filter(Boolean);
-
-        if (corners.length < 4) return;
-        const minX = Math.min(...corners.map(c=>c.x)), maxX = Math.max(...corners.map(c=>c.x));
-        const minY = Math.min(...corners.map(c=>c.y)), maxY = Math.max(...corners.map(c=>c.y));
-
-        if (mx >= minX && mx <= maxX && my >= minY && my <= maxY) {
-          const cx2 = (mx - minX) / (maxX - minX), cy2 = (my - minY) / (maxY - minY);
-          sc.waves.push({ cx: cx2, cy: cy2, r: 0, alpha: 0.95 });
-          sc.particles.forEach(p => { p.target_a = 0.9 + Math.random() * 0.1; });
+        if (sc.hovered) {
+          screenClicked = true;
+          sc.waves.push({ cx: sc.mouseRelX, cy: sc.mouseRelY, r: 0, alpha: 0.98 });
+          sc.particles.forEach(p => { p.target_a = 0.95; });
           sc.lastTouch = performance.now();
-          galleryAudio.playGlintChime(320 + Math.random() * 380);
-          showToast(`Pantalla interactiva activada: ${sc.title}`);
+          if (galleryAudio) galleryAudio.playGlintChime(320 + Math.random() * 380);
+          showToast(`Actividad en Pantalla: ${sc.title}`);
         }
       });
+
+      // Comprobar clic en Puerta de Salida 3D únicamente si no se hizo clic en una pantalla
+      if (!screenClicked) {
+        const doorW = 1.3, doorH = 2.1;
+        const dTL = project3D(-doorW/2, -doorH/2 + 0.15, -5.45);
+        const dTR = project3D( doorW/2, -doorH/2 + 0.15, -5.45);
+        const dBR = project3D( doorW/2,  1.18,           -5.45);
+        const dBL = project3D(-doorW/2,  1.18,           -5.45);
+        if (dTL && dTR && dBR && dBL) {
+          const minDx = Math.min(dTL.x, dBL.x), maxDx = Math.max(dTR.x, dBR.x);
+          const minDy = Math.min(dTL.y, dTR.y), maxDy = Math.max(dBL.y, dBR.y);
+          if (mx >= minDx && mx <= maxDx && my >= minDy && my <= maxDy && camera.z > 1.8) {
+            exitGalleryRoom();
+          }
+        }
+      }
     });
 
-    // D-Pad virtual en pantalla
+    // D-Pad virtual
     function dpad(id, fn) {
       const b = document.getElementById(id);
       if (b) b.addEventListener('click', fn);
@@ -1454,7 +1688,7 @@ document.addEventListener('DOMContentLoaded', () => {
     dpad('dpadLeft',  () => { const cy2 = Math.cos(camera.yaw), sy = Math.sin(camera.yaw); camera.vx -= cy2 * 0.45; camera.vz -= sy * 0.45; });
     dpad('dpadRight', () => { const cy2 = Math.cos(camera.yaw), sy = Math.sin(camera.yaw); camera.vx += cy2 * 0.45; camera.vz += sy * 0.45; });
 
-    // Controles de Iluminación y Sonido
+    // Slider e Interruptores de Iluminación / Audio
     if (lightRange) lightRange.addEventListener('input', e => lightVal = parseFloat(e.target.value));
     if (lightSelect) lightSelect.addEventListener('change', e => lightMode = e.target.value);
     if (roomAudioBtn) roomAudioBtn.addEventListener('click', () => {

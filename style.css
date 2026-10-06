@@ -1912,6 +1912,42 @@ body {
   color: var(--color-gray-300);
 }
 
+/* Acciones HUD L&S (Puerta de Salida y Pantalla Completa) */
+.ls-hud-actions {
+  display: flex;
+  align-items: center;
+  gap: 0.8rem;
+}
+
+.ls-exit-door-btn, .ls-fullscreen-btn {
+  background: rgba(255, 255, 255, 0.08);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  color: #ffffff;
+  padding: 0.4rem 0.9rem;
+  border-radius: 20px;
+  font-size: 0.72rem;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  cursor: pointer;
+  transition: all 0.25s ease;
+}
+
+.ls-exit-door-btn:hover {
+  background: rgba(100, 255, 218, 0.2);
+  border-color: #64ffda;
+  color: #64ffda;
+  box-shadow: 0 0 12px rgba(100, 255, 218, 0.35);
+}
+
+.ls-fullscreen-btn:hover {
+  background: rgba(255, 255, 255, 0.2);
+  border-color: #ffffff;
+  box-shadow: 0 0 12px rgba(255, 255, 255, 0.35);
+}
+
 /* D-Pad en Pantalla para Control de Caminata */
 .onscreen-nav-pad {
   position: absolute;

@@ -604,12 +604,13 @@
           </div>
           <div class="heading-right">
             <p class="section-lead-text">
-              <strong>Luz &amp; Sonido:</strong> Recorre virtualmente la sala como en un videojuego 3D en primera persona. Mueve el ratón para mirar en cualquier dirección en 360°, usa la rueda o clic para caminar y acércate a las instalaciones reactivas.
+              <strong>Penumbra &amp; Luz:</strong> Recorre virtualmente la instalación inmersiva de iluminación atenuada y penumbra. Apunta e interactúa con las <strong>pantallas digitales</strong> que reaccionan generando <strong>ondas visuales expandiéndose</strong> en tiempo real. La estructura 3D cuenta con una <strong>puerta de salida visible</strong> para egresar del recinto o alternar en pantalla completa.
             </p>
             <div class="ls-tips-row">
-              <span class="tip-tag">🖱 Mouse 360°: Mirar / Apuntar</span>
-              <span class="tip-tag">📜 Rueda / Clic: Avanzar y retroceder</span>
-              <span class="tip-tag">⌨ W / A / S / D: Caminar en el espacio</span>
+              <span class="tip-tag">🖱 Mouse &amp; Ondas: Mover para generar ondas visuales</span>
+              <span class="tip-tag">🖥 Pantallas: Apuntar / Clic para activar resonancias</span>
+              <span class="tip-tag">🚪 Puerta 3D: Salida física visible en la pared trasera</span>
+              <span class="tip-tag">⌨ W / A / S / D: Caminar en la sala 3D</span>
             </div>
           </div>
         </div>
@@ -620,7 +621,7 @@
           <div class="room-hud-bar">
             <div class="room-hud-item">
               <span class="room-indicator-point"></span>
-              <span>SALA C: ESPACIO DE PENUMBRA</span>
+              <span>SALA C: INSTALACIÓN PENUMBRA &amp; LUZ</span>
             </div>
             <div class="room-hud-coords">
               <span>POSICIÓN: X: <strong id="coordX">0.0</strong> | Z: <strong id="coordZ">3.5</strong> | VISTA: <strong id="coordAngle">0°</strong></span>
@@ -633,7 +634,7 @@
 
           <!-- Escenario 3D de la Galería -->
           <div class="interactive-gallery-viewport" id="galleryViewport">
-            <!-- Canvas 3D que renderiza la perspectiva arquitectónica, muros, luces y la escultura central -->
+            <!-- Canvas 3D que renderiza la perspectiva arquitectónica, muros, luces, pantallas y la puerta de salida -->
             <canvas id="virtualRoomCanvas" width="1000" height="650"></canvas>
 
             <!-- Retícula / Mira central estilo videojuego 3D -->
@@ -658,7 +659,7 @@
               <div class="hotspot-pulse"></div>
               <div class="hotspot-card glass-card">
                 <h5>INSTALACIÓN LUMÍNICA: "VACÍO RESONANTE"</h5>
-                <p>Haces colimados de 5500K y generador de ondas sinusoidales reactivo.</p>
+                <p>Monolito de penumbra y haces difusos reactivos a la presencia del observador.</p>
               </div>
             </div>
 
@@ -673,15 +674,15 @@
             </div>
 
             <div class="walk-hint-box" id="walkHintBox">
-              <span>🕹 <strong>MODO VIDEOJUEGO 3D:</strong> Mueve el mouse para girar la cámara · Rueda o Clic para avanzar · Teclas W/A/S/D · Pulsa ESC para liberar mouse</span>
+              <span>🕹 <strong>ESTRUCTURA DE PENUMBRA:</strong> Mueve el mouse para generar ondas visuales · Rueda/Clic para avanzar · Pulsa ESC o interactúa con la Puerta 3D para salir</span>
             </div>
           </div>
 
           <!-- Barra de Herramientas de Luz y Sonido -->
           <div class="room-environment-controls glass-bar">
             <div class="env-control-item">
-              <label for="lightIntensityRange">INTENSIDAD DE LUZ DE SALA:</label>
-              <input type="range" id="lightIntensityRange" min="0.1" max="1" step="0.05" value="0.6" class="custom-range">
+              <label for="lightIntensityRange">INTENSIDAD DE PENUMBRA &amp; LUZ:</label>
+              <input type="range" id="lightIntensityRange" min="0.05" max="0.75" step="0.05" value="0.35" class="custom-range">
             </div>
 
             <div class="env-control-item">
