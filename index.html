@@ -589,8 +589,8 @@
 
     <!-- ==============================================
          PÁGINA INTERNA 3: SECCIÓN L&S (LUZ & SONIDO)
-         EL USUARIO PUEDE RECORRER UN ESPACIO Y GIRAR 
-         ALREDEDOR DE LA OBRA CON EL MOUSE
+         SALA ELÁSTICA: AMBIENTE DE MEMBRANA, BOLAS DE LUZ,
+         RECORRIDOS POR TENSIÓN Y REFLEJOS EN EL TECHO
          ============================================== -->
     <section class="page-section section-ls" id="ls">
       <div class="section-container">
@@ -604,13 +604,13 @@
           </div>
           <div class="heading-right">
             <p class="section-lead-text">
-              <strong>Penumbra &amp; Luz:</strong> Recorre virtualmente la instalación inmersiva de iluminación atenuada y penumbra. Apunta e interactúa con las <strong>pantallas digitales</strong> que reaccionan generando <strong>ondas visuales expandiéndose</strong> en tiempo real. La estructura 3D cuenta con una <strong>puerta de salida visible</strong> para egresar del recinto o alternar en pantalla completa.
+              <strong>Sala Elástica &amp; Recorridos de Luz:</strong> Ingresa a un ambiente tridimensional de membrana deformable. Al arrojar <strong>bolas de luz</strong>, los impactos transmiten energía y deforman el suelo y las paredes en tiempo real, describiendo <strong>recorridos lumínicos que se apagan al disiparse la tensión elástica</strong>. Desde las alturas, <strong>esferas suspendidas</strong> reflejan en vivo todo lo que sucede en el piso.
             </p>
             <div class="ls-tips-row">
-              <span class="tip-tag">🖱 Mouse &amp; Ondas: Mover para generar ondas visuales</span>
-              <span class="tip-tag">🖥 Pantallas: Apuntar / Clic para activar resonancias</span>
-              <span class="tip-tag">🚪 Puerta 3D: Salida física visible en la pared trasera</span>
-              <span class="tip-tag">⌨ W / A / S / D: Caminar en la sala 3D</span>
+              <span class="tip-tag">🖱 Clic + Arrastrar: Apuntar y lanzar bola con fuerza</span>
+              <span class="tip-tag">✨ Estelas: Permanecen vivas mientras perdure la tensión</span>
+              <span class="tip-tag">🪞 Techo: Esferas suspendidas reflejan el suelo</span>
+              <span class="tip-tag">⌨ Espacio: Ráfaga de luces // 1-4: Vistas de cámara</span>
             </div>
           </div>
         </div>
@@ -621,85 +621,95 @@
           <div class="room-hud-bar">
             <div class="room-hud-item">
               <span class="room-indicator-point"></span>
-              <span>SALA C: INSTALACIÓN PENUMBRA &amp; LUZ</span>
+              <span>SALA C: AMBIENTE ELÁSTICO &amp; RESIDUAL DE LUZ</span>
             </div>
-            <div class="room-hud-coords">
-              <span>POSICIÓN: X: <strong id="coordX">0.0</strong> | Z: <strong id="coordZ">3.5</strong> | VISTA: <strong id="coordAngle">0°</strong></span>
+            
+            <!-- Monitor de Tensión Elástica en Tiempo Real -->
+            <div class="ls-tension-monitor" id="lsTensionMonitor">
+              <span class="tension-label">TENSIÓN DE SALA:</span>
+              <div class="ls-tension-bar-track">
+                <div class="ls-tension-bar-fill" id="lsTensionFill"></div>
+              </div>
+              <strong id="lsTensionPercent" class="ls-tension-val">0%</strong>
             </div>
+
+            <!-- Estado de Audio y Acciones -->
             <div class="room-sound-indicator">
               <span class="synth-indicator-pulse" id="synthPulse"></span>
-              <span id="synthStatusText">SINTETIZADOR LISTO</span>
+              <span id="synthStatusText">AUDIO ESPACIAL LISTO</span>
+            </div>
+
+            <div class="ls-hud-actions">
+              <button id="lsFullscreenBtn" class="tool-btn ls-fullscreen-btn" title="Pantalla Completa">
+                <span class="tool-icon">⤢</span><span>PANTALLA COMPLETA</span>
+              </button>
             </div>
           </div>
 
           <!-- Escenario 3D de la Galería -->
-          <div class="interactive-gallery-viewport" id="galleryViewport">
-            <!-- Canvas 3D que renderiza la perspectiva arquitectónica, muros, luces, pantallas y la puerta de salida -->
-            <canvas id="virtualRoomCanvas" width="1000" height="650"></canvas>
+          <div class="interactive-gallery-viewport" id="galleryViewport" style="position: relative; width: 100%; height: 650px; overflow: hidden; background: #030408; border-radius: 4px;">
+            <!-- Contenedor WebGL para Three.js -->
+            <div id="lsThreeContainer" style="width: 100%; height: 100%; position: absolute; top: 0; left: 0;"></div>
 
-            <!-- Retícula / Mira central estilo videojuego 3D -->
-            <div class="fps-crosshair" id="fpsCrosshair">
-              <div class="crosshair-dot"></div>
-              <div class="crosshair-lines"></div>
+            <!-- Selector Flotante de Ángulos de Cámara -->
+            <div class="ls-cam-selector-floating" id="lsCamSelectorFloating">
+              <button class="ls-cam-pill active" data-view="general" id="camBtnGeneral">VISTA GENERAL</button>
+              <button class="ls-cam-pill" data-view="floor" id="camBtnFloor">AL RAS DEL SUELO</button>
+              <button class="ls-cam-pill" data-view="ceiling" id="camBtnCeiling">ESFERAS DE TECHO</button>
+              <button class="ls-cam-pill" data-view="top" id="camBtnTop">CENITAL</button>
             </div>
 
-            <!-- Mini Radar / Mapa en tiempo real -->
-            <div class="room-minimap-radar" id="roomMinimapRadar">
-              <canvas id="minimapCanvas" width="80" height="80"></canvas>
-              <span class="radar-label">MAPA 3D</span>
-            </div>
-
-            <!-- Botón de Modo Videojuego / Fijación de Cursor -->
-            <button class="btn-fps-mode glass-btn" id="btnFpsMode">
-              <span class="game-icon">🎮</span> MODO VIDEOJUEGO 3D (CLIC PARA ACTIVAR)
-            </button>
-
-            <!-- Hotspots o puntos de información dentro del espacio -->
-            <div class="room-hotspot" id="hotspotCenter" style="top: 50%; left: 50%;">
-              <div class="hotspot-pulse"></div>
-              <div class="hotspot-card glass-card">
-                <h5>INSTALACIÓN LUMÍNICA: "VACÍO RESONANTE"</h5>
-                <p>Monolito de penumbra y haces difusos reactivos a la presencia del observador.</p>
-              </div>
-            </div>
-
-            <!-- Controles virtuales en pantalla para dispositivos táctiles o mouse click -->
-            <div class="onscreen-nav-pad">
-              <button class="dpad-btn up" id="dpadUp" title="Avanzar">▲</button>
-              <div class="dpad-row">
-                <button class="dpad-btn left" id="dpadLeft" title="Desplazar a la izquierda">◀</button>
-                <button class="dpad-btn down" id="dpadDown" title="Retroceder">▼</button>
-                <button class="dpad-btn right" id="dpadRight" title="Desplazar a la derecha">▶</button>
-              </div>
-            </div>
-
+            <!-- Mensaje flotante de interacción -->
             <div class="walk-hint-box" id="walkHintBox">
-              <span>🕹 <strong>ESTRUCTURA DE PENUMBRA:</strong> Mueve el mouse para generar ondas visuales · Rueda/Clic para avanzar · Pulsa ESC o interactúa con la Puerta 3D para salir</span>
+              <span>🕹 <strong>SALA ELÁSTICA:</strong> Clic + Arrastra para apuntar y lanzar · Clic directo para marcar punto · Arrastra clic derecho para rotar órbita · Espacio para ráfaga</span>
             </div>
           </div>
 
-          <!-- Barra de Herramientas de Luz y Sonido -->
+          <!-- Barra de Herramientas de Luz, Tono y Acciones -->
           <div class="room-environment-controls glass-bar">
-            <div class="env-control-item">
-              <label for="lightIntensityRange">INTENSIDAD DE PENUMBRA &amp; LUZ:</label>
-              <input type="range" id="lightIntensityRange" min="0.05" max="0.75" step="0.05" value="0.35" class="custom-range">
+            
+            <div class="env-control-item ls-color-picker-item">
+              <label>TONO DE LUZ:</label>
+              <div class="ls-color-strip" id="lsColorStrip">
+                <button class="ls-color-dot active" data-color="cyan" style="--c: #00f0ff;" title="Cyan Eléctrico"></button>
+                <button class="ls-color-dot" data-color="magenta" style="--c: #ff0077;" title="Neón Magenta"></button>
+                <button class="ls-color-dot" data-color="amber" style="--c: #ffb700;" title="Ámbar Solar"></button>
+                <button class="ls-color-dot" data-color="emerald" style="--c: #00ffaa;" title="Esmeralda Cuántico"></button>
+                <button class="ls-color-dot" data-color="white" style="--c: #f5f8ff;" title="Blanco Cósmico"></button>
+              </div>
             </div>
 
             <div class="env-control-item">
-              <label for="spotlightColorSelect">TEMPERATURA LUMÍNICA:</label>
-              <select id="spotlightColorSelect" class="custom-select">
-                <option value="pure-white">Blanco Puro (6500K)</option>
-                <option value="warm-noir">Plata Suave (4500K)</option>
-                <option value="deep-contrast">Contraste Extremo</option>
-              </select>
+              <button class="btn-tool-action glass-btn primary" id="btnLsThrow">
+                <span class="btn-icon">⚡</span> LANZAR BOLA
+              </button>
+            </div>
+
+            <div class="env-control-item">
+              <button class="btn-tool-action glass-btn" id="btnLsShower">
+                <span class="btn-icon">✨</span> RÁFAGA
+              </button>
+            </div>
+
+            <div class="env-control-item">
+              <button class="btn-tool-action glass-btn" id="btnLsDisturb">
+                <span class="btn-icon">〰</span> PISAR SUELO
+              </button>
+            </div>
+
+            <div class="env-control-item">
+              <button class="btn-tool-action glass-btn" id="btnLsClear">
+                <span class="btn-icon">🗑</span> LIMPIAR
+              </button>
             </div>
 
             <div class="env-control-item">
               <button class="btn-synth-toggle" id="audioAmbientRoomBtn">
                 <span class="synth-icon">🔊</span>
-                <span id="roomAudioBtnText">RESONANCIA AMBIENTAL ON</span>
+                <span id="roomAudioBtnText">AUDIO ESPACIAL ON</span>
               </button>
             </div>
+
           </div>
 
         </div>
@@ -994,6 +1004,8 @@
     </div>
   </footer>
 
+  <script src="libs/three.min.js"></script>
+  <script src="libs/OrbitControls.js"></script>
   <script src="script.js"></script>
 </body>
 </html>

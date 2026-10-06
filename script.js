@@ -816,888 +816,791 @@ document.addEventListener('DOMContentLoaded', () => {
   }
 
   /* ══════════════════════════════════════════════════════════════
-     9. SECCIÓN L&S: SALA INMERSIVA COMPLETA (PENUMBRA & LUZ)
-        - Propuesta de Penumbra y Luz suave (luz atenuada por defecto)
-        - Pantallas interactivas laterales con cambio de estado al mouse
-        - Generador de Ondas Visuales (ripples) reactivo al movimiento del ratón
-        - Puerta de salida visible en la estructura 3D + HUD
-        - Compatibilidad completa con Pantalla Completa
+     9. SECCIÓN L&S: SALA ELÁSTICA V2.0 (THREE.JS + FÍSICA DE MEMBRANA)
+        - Suelo y 4 paredes con simulación de ondas elásticas en tiempo real
+        - Bolas de luz arrojables con rebote cinético e inyección de impulso
+        - Recorridos de luz (trails) acoplados a la tensión de la sala
+        - Esferas de techo reflectantes con CubeCamera en tiempo real
+        - Sintetizador espacial reactivo a la tensión elástica
      ══════════════════════════════════════════════════════════════ */
-  const roomCanvas   = document.getElementById('virtualRoomCanvas');
-  const lsSection    = document.getElementById('ls');
-  const coordX       = document.getElementById('coordX');
-  const coordZ       = document.getElementById('coordZ');
-  const coordAngle   = document.getElementById('coordAngle');
-  const lightRange   = document.getElementById('lightIntensityRange');
-  const lightSelect  = document.getElementById('spotlightColorSelect');
-  const roomAudioBtn = document.getElementById('audioAmbientRoomBtn');
-  const synthPulse   = document.getElementById('synthPulse');
-  const synthStatus  = document.getElementById('synthStatusText');
-  const hotspot      = document.getElementById('hotspotCenter');
-  const hotspotExit  = document.getElementById('hotspotExit');
-  const btnFpsMode   = document.getElementById('btnFpsMode');
-  const fpsCrosshair = document.getElementById('fpsCrosshair');
-  const minimapCanvas= document.getElementById('minimapCanvas');
-  const roomCard     = document.getElementById('virtualRoomCard');
 
-  // ── Botones de Pantalla Completa y Puerta de Salida en el HUD ───────
-  let fsBtn = null;
-  let exitBtn = null;
+  (function initElasticRoomLS() {
+    const container = document.getElementById('lsThreeContainer');
+    const viewport = document.getElementById('galleryViewport');
+    const lsSection = document.getElementById('ls');
+    if (!container || typeof THREE === 'undefined') return;
 
-  if (roomCard) {
-    const hud = roomCard.querySelector('.room-hud-bar');
-    if (hud) {
-      // Contenedor de acciones HUD
-      const actionsGroup = document.createElement('div');
-      actionsGroup.className = 'ls-hud-actions';
+    // --- Audio Engine para Sala Elástica ---
+    class LSSoundEngine {
+      constructor() {
+        this.ctx = null;
+        this.enabled = true;
+        this.initialized = false;
+        this.droneGain = null;
+        this.droneFilter = null;
+        this.scale = [220, 261.63, 293.66, 329.63, 392, 440, 523.25, 587.33, 659.25, 783.99];
+      }
+      init() {
+        if (this.initialized) return;
+        try {
+          const AudioContext = window.AudioContext || window.webkitAudioContext;
+          this.ctx = new AudioContext();
+          
+          const osc1 = this.ctx.createOscillator();
+          osc1.type = 'sine';
+          osc1.frequency.value = 55;
 
-      // Botón Puerta de Salida HUD
-      exitBtn = document.createElement('button');
-      exitBtn.id = 'lsExitDoorBtn';
-      exitBtn.className = 'tool-btn ls-exit-door-btn';
-      exitBtn.innerHTML = '<span class="tool-icon">🚪</span><span>PUERTA DE SALIDA</span>';
-      actionsGroup.appendChild(exitBtn);
+          const osc2 = this.ctx.createOscillator();
+          osc2.type = 'triangle';
+          osc2.frequency.value = 110.5;
 
-      // Botón Pantalla Completa
-      fsBtn = document.createElement('button');
-      fsBtn.id = 'lsFullscreenBtn';
-      fsBtn.className = 'tool-btn ls-fullscreen-btn';
-      fsBtn.innerHTML = '<span class="tool-icon">⤢</span><span>PANTALLA COMPLETA</span>';
-      actionsGroup.appendChild(fsBtn);
+          this.droneFilter = this.ctx.createBiquadFilter();
+          this.droneFilter.type = 'lowpass';
+          this.droneFilter.frequency.value = 140;
 
-      hud.appendChild(actionsGroup);
+          this.droneGain = this.ctx.createGain();
+          this.droneGain.gain.value = 0.0001;
+
+          osc1.connect(this.droneFilter);
+          osc2.connect(this.droneFilter);
+          this.droneFilter.connect(this.droneGain);
+          this.droneGain.connect(this.ctx.destination);
+
+          osc1.start();
+          osc2.start();
+          this.initialized = true;
+        } catch (e) { console.warn('LSSoundEngine:', e); }
+      }
+      resume() {
+        if (this.ctx && this.ctx.state === 'suspended') this.ctx.resume();
+      }
+      updateTension(tension) {
+        if (!this.ctx || !this.initialized || !this.enabled) return;
+        const now = this.ctx.currentTime;
+        const t = Math.min(Math.max(tension, 0), 1);
+        if (this.droneGain) {
+          const targetGain = t > 0.02 ? 0.015 + t * 0.1 : 0.0001;
+          this.droneGain.gain.setTargetAtTime(targetGain, now, 0.1);
+        }
+        if (this.droneFilter) {
+          this.droneFilter.frequency.setTargetAtTime(140 + t * 650, now, 0.1);
+        }
+      }
+      playBounce(strength = 1.0, isWall = false) {
+        if (!this.ctx || !this.initialized || !this.enabled) return;
+        this.resume();
+        const now = this.ctx.currentTime;
+        const osc = this.ctx.createOscillator();
+        const gain = this.ctx.createGain();
+        const note = this.scale[Math.floor(Math.random() * (this.scale.length - 2))];
+        osc.type = isWall ? 'triangle' : 'sine';
+        osc.frequency.setValueAtTime(note, now);
+        osc.frequency.exponentialRampToValueAtTime(note * 0.94, now + 0.3);
+        const amp = Math.min(Math.max(strength * 0.14, 0.02), 0.18);
+        gain.gain.setValueAtTime(amp, now);
+        gain.gain.exponentialRampToValueAtTime(0.0001, now + (isWall ? 0.25 : 0.5));
+        osc.connect(gain);
+        gain.connect(this.ctx.destination);
+        osc.start(now);
+        osc.stop(now + 0.55);
+      }
+      playLaunch() {
+        if (!this.ctx || !this.initialized || !this.enabled) return;
+        this.resume();
+        const now = this.ctx.currentTime;
+        const osc = this.ctx.createOscillator();
+        const gain = this.ctx.createGain();
+        osc.type = 'sine';
+        osc.frequency.setValueAtTime(320, now);
+        osc.frequency.exponentialRampToValueAtTime(640, now + 0.22);
+        gain.gain.setValueAtTime(0.001, now);
+        gain.gain.linearRampToValueAtTime(0.1, now + 0.03);
+        gain.gain.exponentialRampToValueAtTime(0.0001, now + 0.28);
+        osc.connect(gain);
+        gain.connect(this.ctx.destination);
+        osc.start(now);
+        osc.stop(now + 0.3);
+      }
+      toggle() {
+        this.init();
+        this.enabled = !this.enabled;
+        if (!this.enabled && this.droneGain) {
+          this.droneGain.gain.setValueAtTime(0.0001, this.ctx.currentTime);
+        }
+        return this.enabled;
+      }
     }
-  }
+    const lsAudio = new LSSoundEngine();
 
-  if (roomCanvas) {
-    const ctx = roomCanvas.getContext('2d');
-    const miniCtx = minimapCanvas ? minimapCanvas.getContext('2d') : null;
+    // --- Física de Malla Elástica (Suelo) ---
+    class LSElasticFloor {
+      constructor(size = 28, res = 60) {
+        this.size = size;
+        this.res = res;
+        this.numVertices = (res + 1) * (res + 1);
+        this.current = new Float32Array(this.numVertices);
+        this.previous = new Float32Array(this.numVertices);
+        this.velocity = new Float32Array(this.numVertices);
+        this.c2 = 0.28;
+        this.damping = 0.982;
+        this.tension = 0.0;
 
-    // ── Estado de la cámara y física 3D ─────────────────────
-    const camera = {
-      x: 0,
-      y: 0,
-      z: 8,
-      yaw: 0,
-      pitch: 0.05,
-      targetYaw: 0,
-      targetPitch: 0.05,
-      vx: 0,
-      vz: 0,
-      headBob: 0,
-      isMoving: false
+        this.geometry = new THREE.PlaneGeometry(size, size, res, res);
+        this.geometry.rotateX(-Math.PI / 2);
+
+        const colors = new Float32Array(this.numVertices * 3);
+        for (let i = 0; i < this.numVertices * 3; i += 3) {
+          colors[i] = 0.02; colors[i + 1] = 0.06; colors[i + 2] = 0.14;
+        }
+        this.geometry.setAttribute('color', new THREE.BufferAttribute(colors, 3));
+
+        this.material = new THREE.MeshStandardMaterial({
+          color: 0x050814,
+          vertexColors: true,
+          roughness: 0.4,
+          metalness: 0.8
+        });
+        this.mesh = new THREE.Mesh(this.geometry, this.material);
+
+        const wireGeo = new THREE.PlaneGeometry(size, size, Math.floor(res / 2), Math.floor(res / 2));
+        wireGeo.rotateX(-Math.PI / 2);
+        this.wireMaterial = new THREE.MeshBasicMaterial({
+          color: 0x00f0ff,
+          wireframe: true,
+          transparent: true,
+          opacity: 0.14,
+          blending: THREE.AdditiveBlending
+        });
+        this.wireMesh = new THREE.Mesh(wireGeo, this.wireMaterial);
+        this.wireMesh.position.y = 0.02;
+        this.mesh.add(this.wireMesh);
+      }
+
+      disturb(x, z, strength = 1.0, radius = 1.8) {
+        const half = this.size / 2;
+        const gx = ((x + half) / this.size) * this.res;
+        const gz = ((z + half) / this.size) * this.res;
+        const rCells = Math.ceil((radius / this.size) * this.res);
+        const minX = Math.max(0, Math.floor(gx - rCells));
+        const maxX = Math.min(this.res, Math.ceil(gx + rCells));
+        const minZ = Math.max(0, Math.floor(gz - rCells));
+        const maxZ = Math.min(this.res, Math.ceil(gz + rCells));
+
+        for (let j = minZ; j <= maxZ; j++) {
+          for (let i = minX; i <= maxX; i++) {
+            const dx = (i - gx) * (this.size / this.res);
+            const dz = (j - gz) * (this.size / this.res);
+            const distSq = dx * dx + dz * dz;
+            if (distSq < radius * radius) {
+              const falloff = Math.exp(-distSq / (2 * (radius * 0.45) * (radius * 0.45)));
+              const idx = j * (this.res + 1) + i;
+              this.current[idx] -= strength * falloff;
+            }
+          }
+        }
+      }
+
+      update() {
+        const r = this.res;
+        const stride = r + 1;
+        let sumTension = 0;
+
+        for (let j = 1; j < r; j++) {
+          const row = j * stride;
+          for (let i = 1; i < r; i++) {
+            const idx = row + i;
+            const u = this.current[idx];
+            const uPrev = this.previous[idx];
+            const laplacian = this.current[idx - 1] + this.current[idx + 1] +
+                              this.current[idx - stride] + this.current[idx + stride] - 4.0 * u;
+            let next = (2.0 * u - uPrev + this.c2 * laplacian) * this.damping;
+            this.velocity[idx] = next - u;
+            this.previous[idx] = u;
+            this.current[idx] = next;
+            sumTension += Math.abs(next);
+          }
+        }
+
+        this.tension = Math.min(sumTension / (this.res * 12.0), 1.0);
+
+        const posAttr = this.geometry.attributes.position;
+        const colAttr = this.geometry.attributes.color;
+        const posArr = posAttr.array;
+        const colArr = colAttr.array;
+
+        for (let k = 0; k < this.numVertices; k++) {
+          const h = this.current[k];
+          posArr[k * 3 + 1] = h;
+          const absH = Math.abs(h);
+          if (absH > 0.01) {
+            const stress = Math.min(absH * 1.6, 1.0);
+            if (stress < 0.5) {
+              colArr[k * 3 + 0] = 0.02;
+              colArr[k * 3 + 1] = 0.06 + stress * 1.8;
+              colArr[k * 3 + 2] = 0.14 + stress * 1.7;
+            } else {
+              colArr[k * 3 + 0] = (stress - 0.5) * 2.0;
+              colArr[k * 3 + 1] = 0.9 - (stress - 0.5) * 1.5;
+              colArr[k * 3 + 2] = 1.0;
+            }
+          } else {
+            colArr[k * 3 + 0] = 0.02;
+            colArr[k * 3 + 1] = 0.06;
+            colArr[k * 3 + 2] = 0.14;
+          }
+        }
+
+        posAttr.needsUpdate = true;
+        colAttr.needsUpdate = true;
+        this.geometry.computeVertexNormals();
+        this.wireMaterial.opacity = 0.1 + this.tension * 0.6;
+      }
+
+      getHeightAt(x, z) {
+        const half = this.size / 2;
+        if (x < -half || x > half || z < -half || z > half) return 0;
+        const gx = ((x + half) / this.size) * this.res;
+        const gz = ((z + half) / this.size) * this.res;
+        const ix = Math.floor(gx);
+        const iz = Math.floor(gz);
+        const idx = iz * (this.res + 1) + ix;
+        return this.current[idx] || 0;
+      }
+    }
+
+    // --- Física de Paredes Elásticas ---
+    class LSElasticWall {
+      constructor(width, height, resW = 28, resH = 16, sign = 1) {
+        this.width = width;
+        this.height = height;
+        this.resW = resW;
+        this.resH = resH;
+        this.sign = sign;
+        this.numVertices = (resW + 1) * (resH + 1);
+        this.current = new Float32Array(this.numVertices);
+        this.previous = new Float32Array(this.numVertices);
+        this.c2 = 0.25;
+        this.damping = 0.978;
+        this.tension = 0.0;
+
+        this.geometry = new THREE.PlaneGeometry(width, height, resW, resH);
+        this.material = new THREE.MeshStandardMaterial({
+          color: 0x050711,
+          roughness: 0.5,
+          metalness: 0.8,
+          transparent: true,
+          opacity: 0.9
+        });
+        this.mesh = new THREE.Mesh(this.geometry, this.material);
+      }
+      disturb(uPos, vPos, strength = 0.8) {
+        const gu = Math.floor(((uPos + this.width / 2) / this.width) * this.resW);
+        const gv = Math.floor(((vPos + this.height / 2) / this.height) * this.resH);
+        if (gu >= 0 && gu <= this.resW && gv >= 0 && gv <= this.resH) {
+          const idx = gv * (this.resW + 1) + gu;
+          this.current[idx] -= strength * this.sign;
+        }
+      }
+      update() {
+        const rw = this.resW, rh = this.resH, stride = rw + 1;
+        let sumTension = 0;
+        for (let j = 1; j < rh; j++) {
+          const row = j * stride;
+          for (let i = 1; i < rw; i++) {
+            const idx = row + i;
+            const u = this.current[idx];
+            const uPrev = this.previous[idx];
+            const laplacian = this.current[idx - 1] + this.current[idx + 1] +
+                              this.current[idx - stride] + this.current[idx + stride] - 4.0 * u;
+            const next = (2.0 * u - uPrev + this.c2 * laplacian) * this.damping;
+            this.previous[idx] = u;
+            this.current[idx] = next;
+            sumTension += Math.abs(next);
+          }
+        }
+        this.tension = Math.min(sumTension / (rw * 8.0), 1.0);
+        const posArr = this.geometry.attributes.position.array;
+        for (let k = 0; k < this.numVertices; k++) {
+          posArr[k * 3 + 2] = this.current[k];
+        }
+        this.geometry.attributes.position.needsUpdate = true;
+      }
+    }
+
+    // --- Escena Three.js & Configuración ---
+    const ROOM_SIZE = 28;
+    const ROOM_HEIGHT = 14;
+    const PALETTE = {
+      cyan: { hex: 0x00f0ff, css: '#00f0ff', name: 'Cyan Eléctrico' },
+      magenta: { hex: 0xff0077, css: '#ff0077', name: 'Neón Magenta' },
+      amber: { hex: 0xffb700, css: '#ffb700', name: 'Ámbar Solar' },
+      emerald: { hex: 0x00ffaa, css: '#00ffaa', name: 'Esmeralda Cuántico' },
+      white: { hex: 0xf5f8ff, css: '#f5f8ff', name: 'Blanco Cósmico' }
     };
+    let currentColorKey = 'cyan';
 
-    let isPointerLocked = false;
-    let mouseDownWalk = false;
-    let mouseBackWalk = false;
-    let lookMode = false, lastMX = 0, lastMY = 0;
-    let lightVal = 0.35, lightMode = 'pure-white', roomSound = false; // Luz más suave por defecto (0.35)
-    let walkStepCycle = 0;
+    const scene = new THREE.Scene();
+    scene.background = new THREE.Color(0x03050a);
+    scene.fog = new THREE.FogExp2(0x03050a, 0.016);
 
-    // ── Coordenadas del ratón en la sala ────────────────────
-    let currentMouseX = roomCanvas.width / 2;
-    let currentMouseY = roomCanvas.height / 2;
+    const camera = new THREE.PerspectiveCamera(50, viewport.clientWidth / viewport.clientHeight, 0.1, 150);
+    camera.position.set(0, 10, 24);
 
-    // ── Sistema de Ondas Visuales (Ripples) en la Sala ───────
-    const roomRipples = [];
-    let lastRippleTime = 0;
+    const renderer = new THREE.WebGLRenderer({ antialias: true, powerPreference: 'high-performance' });
+    renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+    renderer.setSize(viewport.clientWidth, viewport.clientHeight);
+    renderer.toneMapping = THREE.ACESFilmicToneMapping;
+    renderer.toneMappingExposure = 1.2;
+    container.appendChild(renderer.domElement);
 
-    function addRoomRipple(x, y, maxR = 120, color = 'rgba(180,220,255,') {
-      roomRipples.push({
-        x, y,
-        r: 0,
-        maxR: maxR,
-        alpha: 0.75,
-        speed: 2.2 + Math.random() * 0.8,
-        color
+    const controls = new THREE.OrbitControls(camera, renderer.domElement);
+    controls.enableDamping = true;
+    controls.dampingFactor = 0.05;
+    controls.maxPolarAngle = Math.PI / 2 + 0.08;
+    controls.minDistance = 3;
+    controls.maxDistance = 45;
+    controls.target.set(0, 2.5, 0);
+
+    // Luces de la Sala
+    const ambLight = new THREE.AmbientLight(0x0c1224, 0.9);
+    scene.add(ambLight);
+    const dirLight = new THREE.DirectionalLight(0x223355, 0.5);
+    dirLight.position.set(0, ROOM_HEIGHT, 0);
+    scene.add(dirLight);
+
+    // Suelo y Paredes Elásticas
+    const floor = new LSElasticFloor(ROOM_SIZE, 60);
+    scene.add(floor.mesh);
+
+    const half = ROOM_SIZE / 2;
+    const walls = [];
+
+    // Back Wall
+    const backWall = new LSElasticWall(ROOM_SIZE, ROOM_HEIGHT, 28, 16, 1);
+    backWall.mesh.position.set(0, ROOM_HEIGHT / 2, -half);
+    scene.add(backWall.mesh);
+    walls.push({ inst: backWall, axis: 'z', pos: -half, dir: 1 });
+
+    // Front Wall (Semi-transparente)
+    const frontWall = new LSElasticWall(ROOM_SIZE, ROOM_HEIGHT, 28, 16, -1);
+    frontWall.mesh.position.set(0, ROOM_HEIGHT / 2, half);
+    frontWall.mesh.rotation.y = Math.PI;
+    frontWall.material.opacity = 0.25;
+    scene.add(frontWall.mesh);
+    walls.push({ inst: frontWall, axis: 'z', pos: half, dir: -1 });
+
+    // Left Wall
+    const leftWall = new LSElasticWall(ROOM_SIZE, ROOM_HEIGHT, 28, 16, 1);
+    leftWall.mesh.position.set(-half, ROOM_HEIGHT / 2, 0);
+    leftWall.mesh.rotation.y = Math.PI / 2;
+    scene.add(leftWall.mesh);
+    walls.push({ inst: leftWall, axis: 'x', pos: -half, dir: 1 });
+
+    // Right Wall
+    const rightWall = new LSElasticWall(ROOM_SIZE, ROOM_HEIGHT, 28, 16, -1);
+    rightWall.mesh.position.set(half, ROOM_HEIGHT / 2, 0);
+    rightWall.mesh.rotation.y = -Math.PI / 2;
+    scene.add(rightWall.mesh);
+    walls.push({ inst: rightWall, axis: 'x', pos: half, dir: -1 });
+
+    // Techo
+    const ceilGeo = new THREE.PlaneGeometry(ROOM_SIZE, ROOM_SIZE);
+    ceilGeo.rotateX(Math.PI / 2);
+    const ceilMesh = new THREE.Mesh(ceilGeo, new THREE.MeshStandardMaterial({ color: 0x04060e, roughness: 0.8 }));
+    ceilMesh.position.y = ROOM_HEIGHT;
+    scene.add(ceilMesh);
+
+    // --- Esferas Suspendidas de Techo con CubeCamera ---
+    const cubeRenderTarget = new THREE.WebGLCubeRenderTarget(256, {
+      generateMipmaps: true,
+      minFilter: THREE.LinearMipmapLinearFilter
+    });
+    const cubeCamera = new THREE.CubeCamera(0.2, 60, cubeRenderTarget);
+    cubeCamera.position.set(0, ROOM_HEIGHT - 4.2, 0);
+    scene.add(cubeCamera);
+
+    const mirrorMat = new THREE.MeshStandardMaterial({
+      color: 0xffffff,
+      metalness: 0.98,
+      roughness: 0.02,
+      envMap: cubeRenderTarget.texture,
+      envMapIntensity: 2.5
+    });
+
+    const ceilingOrbs = [];
+    const orbConfigs = [
+      { x: 0, z: 0, r: 1.4, hang: 4.8, phase: 0, freq: 0.9 },
+      { x: -5, z: -4, r: 1.1, hang: 5.4, phase: 1.2, freq: 1.1 },
+      { x: 5, z: -3.5, r: 1.2, hang: 4.2, phase: 2.5, freq: 0.85 },
+      { x: -4.5, z: 4.5, r: 0.9, hang: 6.0, phase: 3.8, freq: 1.2 },
+      { x: 4.2, z: 5.0, r: 1.0, hang: 5.0, phase: 4.6, freq: 1.0 },
+      { x: -7, z: 1, r: 0.8, hang: 6.2, phase: 0.7, freq: 1.3 },
+      { x: 7, z: 1.5, r: 0.85, hang: 6.0, phase: 2.1, freq: 1.2 }
+    ];
+
+    orbConfigs.forEach(cfg => {
+      const orbMesh = new THREE.Mesh(new THREE.SphereGeometry(cfg.r, 36, 36), mirrorMat);
+      scene.add(orbMesh);
+
+      const wireGeo = new THREE.BufferGeometry().setFromPoints([
+        new THREE.Vector3(cfg.x, ROOM_HEIGHT, cfg.z),
+        new THREE.Vector3(cfg.x, ROOM_HEIGHT - cfg.hang, cfg.z)
+      ]);
+      const wireMesh = new THREE.Line(wireGeo, new THREE.LineBasicMaterial({ color: 0x4488aa, opacity: 0.4, transparent: true }));
+      scene.add(wireMesh);
+
+      ceilingOrbs.push({
+        mesh: orbMesh,
+        wire: wireMesh,
+        anchor: new THREE.Vector3(cfg.x, ROOM_HEIGHT, cfg.z),
+        hang: cfg.hang,
+        phase: cfg.phase,
+        freq: cfg.freq,
+        restY: ROOM_HEIGHT - cfg.hang
       });
-      if (roomRipples.length > 25) roomRipples.shift();
+    });
+
+    // --- Bolas de Luz & Recorridos de Tensión ---
+    let lightSpheres = [];
+    class LightSphere {
+      constructor(origin, velocity, colorDef) {
+        this.radius = 0.52;
+        this.pos = origin.clone();
+        this.vel = velocity.clone();
+        this.gravity = new THREE.Vector3(0, -18.0, 0);
+        this.color = new THREE.Color(colorDef.hex);
+        this.isAlive = true;
+        this.age = 0;
+        this.maxAge = 35;
+
+        this.mesh = new THREE.Mesh(
+          new THREE.SphereGeometry(this.radius, 24, 24),
+          new THREE.MeshBasicMaterial({ color: this.color })
+        );
+        this.mesh.position.copy(this.pos);
+        scene.add(this.mesh);
+
+        this.light = new THREE.PointLight(this.color, 2.2, 14, 1.8);
+        this.light.position.copy(this.pos);
+        scene.add(this.light);
+
+        // Trail Lines
+        this.maxTrail = 140;
+        this.trailPoints = [];
+        this.trailGeo = new THREE.BufferGeometry();
+        this.trailGeo.setAttribute('position', new THREE.BufferAttribute(new Float32Array(this.maxTrail * 3), 3));
+        this.trailGeo.setAttribute('color', new THREE.BufferAttribute(new Float32Array(this.maxTrail * 3), 3));
+        this.trailLine = new THREE.Line(this.trailGeo, new THREE.LineBasicMaterial({
+          vertexColors: true,
+          transparent: true,
+          blending: THREE.AdditiveBlending
+        }));
+        scene.add(this.trailLine);
+      }
+
+      update(dt, tension) {
+        if (!this.isAlive) return;
+        this.age += dt;
+
+        this.vel.addScaledVector(this.gravity, dt);
+        this.vel.multiplyScalar(0.994);
+        this.pos.addScaledVector(this.vel, dt);
+
+        // Suelo
+        const floorH = floor.getHeightAt(this.pos.x, this.pos.z);
+        const contactY = floorH + this.radius;
+        if (this.pos.y <= contactY) {
+          this.pos.y = contactY;
+          const speed = Math.abs(this.vel.y);
+          if (speed > 0.4) {
+            this.vel.y = -this.vel.y * 0.86;
+            floor.disturb(this.pos.x, this.pos.z, Math.min(speed * 0.16, 1.8), 2.2);
+            lsAudio.playBounce(speed * 0.15, false);
+          } else {
+            this.vel.y = 0;
+            this.vel.x *= 0.95;
+            this.vel.z *= 0.95;
+          }
+        }
+
+        // Paredes
+        const hf = ROOM_SIZE / 2 - this.radius;
+        if (this.pos.x > hf) { this.pos.x = hf; this.vel.x = -this.vel.x * 0.85; walls[3].inst.disturb(this.pos.z, this.pos.y - ROOM_HEIGHT / 2); lsAudio.playBounce(0.5, true); }
+        else if (this.pos.x < -hf) { this.pos.x = -hf; this.vel.x = -this.vel.x * 0.85; walls[2].inst.disturb(this.pos.z, this.pos.y - ROOM_HEIGHT / 2); lsAudio.playBounce(0.5, true); }
+        if (this.pos.z > hf) { this.pos.z = hf; this.vel.z = -this.vel.z * 0.85; walls[1].inst.disturb(this.pos.x, this.pos.y - ROOM_HEIGHT / 2); lsAudio.playBounce(0.5, true); }
+        else if (this.pos.z < -hf) { this.pos.z = -hf; this.vel.z = -this.vel.z * 0.85; walls[0].inst.disturb(this.pos.x, this.pos.y - ROOM_HEIGHT / 2); lsAudio.playBounce(0.5, true); }
+
+        this.mesh.position.copy(this.pos);
+        this.light.position.copy(this.pos);
+
+        // Trail Update (se apagan al desaparecer la tensión)
+        this.trailPoints.unshift(this.pos.clone());
+        if (this.trailPoints.length > this.maxTrail) this.trailPoints.pop();
+
+        const posArr = this.trailGeo.attributes.position.array;
+        const colArr = this.trailGeo.attributes.color.array;
+        const len = this.trailPoints.length;
+
+        for (let i = 0; i < this.maxTrail; i++) {
+          if (i < len) {
+            const pt = this.trailPoints[i];
+            posArr[i * 3 + 0] = pt.x;
+            posArr[i * 3 + 1] = pt.y;
+            posArr[i * 3 + 2] = pt.z;
+
+            // Brillo atado a la tensión de la sala
+            const progress = 1.0 - (i / len);
+            const tensionFactor = Math.min(Math.max(tension * 2.8, 0.05), 1.2);
+            const br = progress * tensionFactor;
+
+            colArr[i * 3 + 0] = this.color.r * br;
+            colArr[i * 3 + 1] = this.color.g * br;
+            colArr[i * 3 + 2] = this.color.b * br;
+          } else {
+            colArr[i * 3 + 0] = 0; colArr[i * 3 + 1] = 0; colArr[i * 3 + 2] = 0;
+          }
+        }
+        this.trailGeo.attributes.position.needsUpdate = true;
+        this.trailGeo.attributes.color.needsUpdate = true;
+        this.trailGeo.setDrawRange(0, len);
+      }
+
+      destroy() {
+        this.isAlive = false;
+        scene.remove(this.mesh);
+        scene.remove(this.light);
+        scene.remove(this.trailLine);
+        this.mesh.geometry.dispose();
+        this.mesh.material.dispose();
+        this.trailGeo.dispose();
+        this.trailLine.material.dispose();
+      }
     }
 
-    // ── Función para Salir de la Sala / Pantalla Completa ────
-    function exitGalleryRoom() {
-      if (document.fullscreenElement) {
-        document.exitFullscreen().catch(err => console.warn(err));
-      }
-      if (document.pointerLockElement) {
-        document.exitPointerLock();
-      }
-      camera.x = 0;
-      camera.z = 5.0;
-      camera.targetYaw = 0;
-      camera.targetPitch = 0.05;
-      if (galleryAudio) galleryAudio.playGlintChime(260);
-      showToast('🚪 Puerta de Salida: Has egresado de la Sala L&S');
+    function throwBall(origin, targetDir, speed = 22) {
+      lsAudio.init();
+      const vel = targetDir.clone().normalize().multiplyScalar(speed);
+      vel.y += 3.5;
+      const sphere = new LightSphere(origin, vel, PALETTE[currentColorKey]);
+      lightSpheres.push(sphere);
+      lsAudio.playLaunch();
+      showToast();
     }
 
-    if (exitBtn) exitBtn.addEventListener('click', exitGalleryRoom);
-    if (hotspotExit) hotspotExit.addEventListener('click', exitGalleryRoom);
+    function showerBalls() {
+      lsAudio.init();
+      const keys = Object.keys(PALETTE);
+      for (let i = 0; i < 6; i++) {
+        const ang = (i / 6) * Math.PI * 2;
+        const colKey = keys[i % keys.length];
+        const vel = new THREE.Vector3(Math.cos(ang) * 12, 4 + Math.random() * 4, Math.sin(ang) * 12);
+        const sphere = new LightSphere(new THREE.Vector3(0, 7, 0), vel, PALETTE[colKey]);
+        lightSpheres.push(sphere);
+      }
+      floor.disturb(0, 0, 1.8, 3.5);
+      lsAudio.playBounce(1.0, false);
+      showToast('Ráfaga de luces desplegada en la sala');
+    }
 
-    // Gestor de Pantalla Completa
+    function clearBalls() {
+      lightSpheres.forEach(s => s.destroy());
+      lightSpheres = [];
+      showToast('Recorridos y bolas disueltas');
+    }
+
+    // --- Interacción con Puntero ---
+    const raycaster = new THREE.Raycaster();
+    const mouse = new THREE.Vector2();
+    let isDown = false;
+    let downPos = { x: 0, y: 0 };
+
+    viewport.addEventListener('pointerdown', (e) => {
+      if (e.button !== 0) return;
+      isDown = true;
+      downPos = { x: e.clientX, y: e.clientY };
+    });
+
+    window.addEventListener('pointerup', (e) => {
+      if (!isDown) return;
+      isDown = false;
+      const rect = renderer.domElement.getBoundingClientRect();
+      if (e.clientX < rect.left || e.clientX > rect.right || e.clientY < rect.top || e.clientY > rect.bottom) return;
+
+      const dx = e.clientX - downPos.x;
+      const dy = e.clientY - downPos.y;
+      const dist = Math.hypot(dx, dy);
+
+      mouse.x = ((e.clientX - rect.left) / rect.width) * 2 - 1;
+      mouse.y = -((e.clientY - rect.top) / rect.height) * 2 + 1;
+      raycaster.setFromCamera(mouse, camera);
+
+      if (dist < 12) {
+        const hits = raycaster.intersectObject(floor.mesh);
+        if (hits.length > 0) {
+          const pt = hits[0].point;
+          const start = camera.position.clone().addScaledVector(raycaster.ray.direction, 1.2);
+          const dir = pt.clone().sub(start).normalize();
+          throwBall(start, dir, 22);
+        } else {
+          const start = camera.position.clone().addScaledVector(raycaster.ray.direction, 1.5);
+          throwBall(start, raycaster.ray.direction, 22);
+        }
+      } else {
+        const power = Math.min(Math.max(dist * 0.16, 14), 36);
+        const start = camera.position.clone().addScaledVector(raycaster.ray.direction, 1.5);
+        throwBall(start, raycaster.ray.direction, power);
+      }
+    });
+
+    // --- Controles de UI ---
+    // Color Picker
+    document.querySelectorAll('.ls-color-dot').forEach(btn => {
+      btn.addEventListener('click', () => {
+        document.querySelectorAll('.ls-color-dot').forEach(b => b.classList.remove('active'));
+        btn.classList.add('active');
+        currentColorKey = btn.dataset.color || 'cyan';
+      });
+    });
+
+    // Botones de acción
+    document.getElementById('btnLsThrow')?.addEventListener('click', () => {
+      const dir = new THREE.Vector3();
+      camera.getWorldDirection(dir);
+      throwBall(camera.position.clone().addScaledVector(dir, 1.5), dir, 24);
+    });
+    document.getElementById('btnLsShower')?.addEventListener('click', showerBalls);
+    document.getElementById('btnLsDisturb')?.addEventListener('click', () => {
+      floor.disturb((Math.random() - 0.5) * 12, (Math.random() - 0.5) * 12, 1.6, 2.5);
+      lsAudio.playBounce(0.85, false);
+      showToast('Tensión elástica aplicada al suelo');
+    });
+    document.getElementById('btnLsClear')?.addEventListener('click', clearBalls);
+
+    // Audio Room Toggle
+    const audioBtn = document.getElementById('audioAmbientRoomBtn');
+    const synthStatus = document.getElementById('synthStatusText');
+    if (audioBtn) {
+      audioBtn.addEventListener('click', () => {
+        const active = lsAudio.toggle();
+        audioBtn.classList.toggle('active', active);
+        if (synthStatus) synthStatus.textContent = active ? 'AUDIO ESPACIAL ACTIVO' : 'AUDIO EN SILENCIO';
+        showToast(active ? 'Audio espacial activado' : 'Audio en silencio');
+      });
+    }
+
+    // Cámara Presets
+    function setCamView(name) {
+      let tPos, tLook;
+      if (name === 'general') { tPos = new THREE.Vector3(0, 10, 24); tLook = new THREE.Vector3(0, 2.5, 0); }
+      else if (name === 'floor') { tPos = new THREE.Vector3(0, 1.8, 11); tLook = new THREE.Vector3(0, 0.2, -4); }
+      else if (name === 'ceiling') { tPos = new THREE.Vector3(0, 3.5, 4); tLook = new THREE.Vector3(0, ROOM_HEIGHT - 3, 0); }
+      else if (name === 'top') { tPos = new THREE.Vector3(0, 28, 0.1); tLook = new THREE.Vector3(0, 0, 0); }
+
+      if (tPos && tLook) {
+        camera.position.copy(tPos);
+        controls.target.copy(tLook);
+        document.querySelectorAll('.ls-cam-pill').forEach(b => b.classList.toggle('active', b.dataset.view === name));
+      }
+    }
+    document.querySelectorAll('.ls-cam-pill').forEach(b => b.addEventListener('click', () => setCamView(b.dataset.view)));
+
+    // Pantalla Completa
+    const fsBtn = document.getElementById('lsFullscreenBtn');
     if (fsBtn) {
       fsBtn.addEventListener('click', () => {
+        const card = document.getElementById('virtualRoomCard');
         if (!document.fullscreenElement) {
-          roomCard.requestFullscreen().catch(err => console.warn(err));
+          card?.requestFullscreen().catch(err => console.warn(err));
         } else {
           document.exitFullscreen();
         }
       });
     }
 
-    document.addEventListener('fullscreenchange', () => {
-      const isFS = !!document.fullscreenElement;
-      if (fsBtn) {
-        fsBtn.innerHTML = isFS ?
-          '<span class="tool-icon">⤡</span><span>SALIR PANTALLA COMPLETA</span>' :
-          '<span class="tool-icon">⤢</span><span>PANTALLA COMPLETA</span>';
-      }
-      if (roomCanvas) {
-        roomCanvas.width  = isFS ? window.innerWidth : roomCanvas.parentElement.clientWidth;
-        roomCanvas.height = isFS ? window.innerHeight : roomCanvas.parentElement.clientHeight;
-      }
-    });
-
-    // ── Animación de entrada: "vuelo" de z=8 a z=3.5 ────────
-    let flyIn = true, flyProgress = 0;
-    const FLY_DURATION = 2000;
-    let flyStart = null;
-
-    // ── Partículas ambientales flotantes en penumbra ────────
-    const spaceParticles = Array.from({ length: 80 }, () => ({
-      x: (Math.random() - 0.5) * 8.5,
-      y: -2.0 + Math.random() * 3.2,
-      z: (Math.random() - 0.5) * 11,
-      vx: (Math.random() - 0.5) * 0.0018,
-      vy: (Math.random() - 0.5) * 0.0012,
-      vz: (Math.random() - 0.5) * 0.0018,
-      size: Math.random() * 0.035 + 0.012,
-      alpha: Math.random() * 0.5 + 0.15,
-      phase: Math.random() * Math.PI * 2
-    }));
-
-    // ── Pantallas interactivas digitales en las paredes ──────
-    const screens = [
-      {
-        id: 'screenA',
-        wx: -4.3, wy: -0.2, wz: -0.5,
-        width: 2.6, height: 1.6,
-        particles: [], waves: [],
-        hovered: false, hoverProgress: 0,
-        mouseRelX: 0.5, mouseRelY: 0.5,
-        lastTouch: 0,
-        title: 'PANTALLA A: OSCILADOR DE PENUMBRA',
-        subtitle: 'ESTADO: SENSORES EN LÍNEA'
-      },
-      {
-        id: 'screenB',
-        wx: 4.3, wy: -0.2, wz: -0.5,
-        width: 2.6, height: 1.6,
-        particles: [], waves: [],
-        hovered: false, hoverProgress: 0,
-        mouseRelX: 0.5, mouseRelY: 0.5,
-        lastTouch: 0,
-        title: 'PANTALLA B: MATRIZ DE ONDAS REACTIVAS',
-        subtitle: 'ESTADO: SENSORES EN LÍNEA'
-      },
-      {
-        id: 'screenC',
-        wx: -2.8, wy: -0.2, wz: -5.3,
-        width: 2.2, height: 1.4,
-        particles: [], waves: [],
-        hovered: false, hoverProgress: 0,
-        mouseRelX: 0.5, mouseRelY: 0.5,
-        lastTouch: 0,
-        title: 'PANTALLA C: CAMPOS DE RESONANCIA',
-        subtitle: 'ESTADO: SENSORES EN LÍNEA'
-      }
-    ];
-
-    screens.forEach(sc => {
-      sc.particles = Array.from({ length: 26 }, () => ({
-        x: Math.random(), y: Math.random(),
-        vx: (Math.random() - 0.5) * 0.006,
-        vy: (Math.random() - 0.5) * 0.006,
-        r: Math.random() * 0.035 + 0.015,
-        a: 0.2, target_a: 0.2
-      }));
-    });
-
-    // ── Resize ────────────────────────────────────────────────
-    function resizeRoom() {
-      if (document.fullscreenElement) {
-        roomCanvas.width  = window.innerWidth;
-        roomCanvas.height = window.innerHeight;
-      } else {
-        roomCanvas.width  = roomCanvas.parentElement.clientWidth;
-        roomCanvas.height = roomCanvas.parentElement.clientHeight;
-      }
+    // Resize
+    function handleResize() {
+      const w = viewport.clientWidth;
+      const h = viewport.clientHeight || 650;
+      camera.aspect = w / h;
+      camera.updateProjectionMatrix();
+      renderer.setSize(w, h);
     }
-    resizeRoom();
-    window.addEventListener('resize', resizeRoom);
+    window.addEventListener('resize', handleResize);
 
-    // ── Proyección 3D en Perspectiva ──────────────────────────
-    function project3D(px, py, pz) {
-      let rx = px - camera.x;
-      let ry = py - (camera.y + camera.headBob);
-      let rz = pz - camera.z;
-
-      const cy2 = Math.cos(camera.yaw), sy = Math.sin(camera.yaw);
-      const x1 = rx * cy2 + rz * sy;
-      const z1 = -rx * sy + rz * cy2;
-
-      const cp = Math.cos(camera.pitch), sp = Math.sin(camera.pitch);
-      const y2 = ry * cp - z1 * sp;
-      const z2 = ry * sp + z1 * cp;
-
-      if (z2 <= 0.08) return null;
-      const fov = roomCanvas.height * 0.72;
-      const sc = fov / z2;
-      return { x: roomCanvas.width / 2 + x1 * sc, y: roomCanvas.height / 2 + y2 * sc, sc, depth: z2 };
-    }
-
-    // ── Renderizado del Radar / Minimap 3D ────────────────────
-    function drawMinimap() {
-      if (!miniCtx || !minimapCanvas) return;
-      const mw = minimapCanvas.width, mh = minimapCanvas.height;
-      miniCtx.clearRect(0, 0, mw, mh);
-
-      miniCtx.fillStyle = '#06080d';
-      miniCtx.fillRect(0, 0, mw, mh);
-
-      miniCtx.strokeStyle = 'rgba(255,255,255,0.08)';
-      miniCtx.lineWidth = 1;
-      miniCtx.strokeRect(4, 4, mw - 8, mh - 8);
-      miniCtx.beginPath();
-      miniCtx.moveTo(mw/2, 4); miniCtx.lineTo(mw/2, mh-4);
-      miniCtx.moveTo(4, mh/2); miniCtx.lineTo(mw-4, mh/2);
-      miniCtx.stroke();
-
-      const toMx = (x) => mw/2 + (x / 5.2) * (mw/2 - 8);
-      const toMz = (z) => mh/2 + (z / 6.0) * (mh/2 - 8);
-
-      // Escultura central
-      miniCtx.fillStyle = 'rgba(255,255,255,0.35)';
-      miniCtx.beginPath();
-      miniCtx.arc(toMx(0), toMz(0), 4, 0, Math.PI * 2);
-      miniCtx.fill();
-
-      // Pantallas interactivas
-      miniCtx.fillStyle = 'rgba(120,200,255,0.85)';
-      miniCtx.fillRect(toMx(-4.3) - 2, toMz(-0.5) - 5, 4, 10);
-      miniCtx.fillRect(toMx(4.3) - 2, toMz(-0.5) - 5, 4, 10);
-      miniCtx.fillRect(toMx(-2.8) - 4, toMz(-5.3) - 2, 8, 4);
-
-      // Icono de Puerta de Salida en la pared trasera
-      miniCtx.fillStyle = '#64ffda';
-      miniCtx.fillRect(toMx(0) - 5, toMz(-5.45) - 2, 10, 3);
-
-      // Cono de visión del jugador
-      const px = toMx(camera.x), pz = toMz(camera.z);
-      const viewLen = 13;
-      const leftAngle = camera.yaw - 0.45;
-      const rightAngle = camera.yaw + 0.45;
-
-      miniCtx.fillStyle = 'rgba(255,255,255,0.15)';
-      miniCtx.beginPath();
-      miniCtx.moveTo(px, pz);
-      miniCtx.lineTo(px - Math.sin(leftAngle) * viewLen, pz - Math.cos(leftAngle) * viewLen);
-      miniCtx.lineTo(px - Math.sin(rightAngle) * viewLen, pz - Math.cos(rightAngle) * viewLen);
-      miniCtx.closePath();
-      miniCtx.fill();
-
-      // Punto del jugador
-      miniCtx.fillStyle = '#ffffff';
-      miniCtx.beginPath();
-      miniCtx.arc(px, pz, 3, 0, Math.PI * 2);
-      miniCtx.fill();
-    }
-
-    // ── Teclado WASD / Flechas / Shift ────────────────────────
-    const keys = {};
-    window.addEventListener('keydown', e => {
-      const aEl = document.activeElement;
-      if (aEl && (aEl.tagName==='INPUT'||aEl.tagName==='TEXTAREA')) return;
-      keys[e.key.toLowerCase()] = true;
-    });
-    window.addEventListener('keyup', e => {
-      keys[e.key.toLowerCase()] = false;
+    // Teclado
+    window.addEventListener('keydown', (e) => {
+      if (document.activeElement && ['input', 'textarea', 'select'].includes(document.activeElement.tagName.toLowerCase())) return;
+      if (e.code === 'Space') {
+        const rect = lsSection?.getBoundingClientRect();
+        if (rect && rect.top < window.innerHeight && rect.bottom > 0) {
+          e.preventDefault();
+          showerBalls();
+        }
+      } else if (['1', '2', '3', '4'].includes(e.key)) {
+        const views = ['general', 'floor', 'ceiling', 'top'];
+        setCamView(views[parseInt(e.key) - 1]);
+      }
     });
 
-    // ── Loop Principal de Render y Videojuego 3D ───────────────
-    function renderRoom(ts) {
-      const W = roomCanvas.width, H = roomCanvas.height;
-      ctx.clearRect(0, 0, W, H);
-      const t = ts * 0.001;
+    // --- Bucle de Renderizado ---
+    let frame = 0;
+    const clock = new THREE.Clock();
 
-      // — Animación de entrada suave —
-      if (flyIn) {
-        if (!flyStart) flyStart = ts;
-        flyProgress = Math.min(1, (ts - flyStart) / FLY_DURATION);
-        const ease = 1 - Math.pow(1 - flyProgress, 3);
-        camera.z = 8 - ease * 4.5;
-        camera.pitch = 0.05 + Math.sin(flyProgress * Math.PI) * 0.08;
-        if (flyProgress >= 1) { flyIn = false; camera.z = 3.5; camera.pitch = 0.05; }
-      }
+    function renderLoop() {
+      requestAnimationFrame(renderLoop);
+      const dt = Math.min(clock.getDelta(), 0.05);
+      const time = clock.getElapsedTime();
+      frame++;
 
-      // — Interpolación de cámara —
-      camera.yaw += (camera.targetYaw - camera.yaw) * 0.25;
-      camera.pitch += (camera.targetPitch - camera.pitch) * 0.25;
+      controls.update();
 
-      // — Movimiento y física del jugador —
-      const isSprinting = keys['shift'];
-      const moveSpeed = (isSprinting ? 0.09 : 0.052);
-      const cy2 = Math.cos(camera.yaw), sy = Math.sin(camera.yaw);
+      // Físicas
+      floor.update();
+      let wallsTension = 0;
+      walls.forEach(w => { w.inst.update(); wallsTension += w.inst.tension; });
 
-      let forward = 0, strafe = 0;
-      if (keys['w'] || keys['arrowup'] || mouseDownWalk)   forward += 1;
-      if (keys['s'] || keys['arrowdown'] || mouseBackWalk) forward -= 1;
-      if (keys['a'] || keys['arrowleft'])                  strafe -= 1;
-      if (keys['d'] || keys['arrowright'])                 strafe += 1;
+      const roomTension = Math.min(floor.tension * 0.75 + (wallsTension / walls.length) * 0.25, 1.0);
 
-      if (forward !== 0 || strafe !== 0) {
-        const len = Math.hypot(forward, strafe);
-        forward /= len; strafe /= len;
-        camera.vx += (sy * forward + cy2 * strafe) * moveSpeed;
-        camera.vz += (-cy2 * forward + sy * strafe) * moveSpeed;
-        camera.isMoving = true;
-        walkStepCycle += moveSpeed * 3.5;
-        camera.headBob = Math.sin(walkStepCycle) * 0.035;
-      } else {
-        camera.isMoving = false;
-        camera.headBob *= 0.8;
-      }
+      // UI Tension Meter
+      const tensionPercent = Math.round(roomTension * 100);
+      const tensionFill = document.getElementById('lsTensionFill');
+      const tensionVal = document.getElementById('lsTensionPercent');
+      if (tensionFill) tensionFill.style.width = tensionPercent + '%';
+      if (tensionVal) tensionVal.textContent = tensionPercent + '%';
 
-      camera.x += camera.vx;
-      camera.z += camera.vz;
-      camera.vx *= 0.72;
-      camera.vz *= 0.72;
+      // Audio tension update
+      lsAudio.updateTension(roomTension);
 
-      // Colisiones de la sala
-      camera.x = Math.max(-3.8, Math.min(3.8, camera.x));
-      camera.z = Math.max(-4.4, Math.min(5.2, camera.z));
-
-      // — Fondo de Penumbra de la Sala —
-      let ambR, ambG, ambB;
-      if (lightMode === 'warm-noir')          { ambR=24; ambG=22; ambB=20; }
-      else if (lightMode === 'deep-contrast') { ambR=6;  ambG=6;  ambB=8;  }
-      else                                     { ambR=12; ambG=14; ambB=20; }
-      ctx.fillStyle = `rgb(${ambR},${ambG},${ambB})`;
-      ctx.fillRect(0, 0, W, H);
-
-      // — PAREDES EN PERSPECTIVA 3D —
-      const pBackTL = project3D(-4.5, -2.4, -5.5);
-      const pBackTR = project3D( 4.5, -2.4, -5.5);
-      const pBackBR = project3D( 4.5,  1.2, -5.5);
-      const pBackBL = project3D(-4.5,  1.2, -5.5);
-
-      if (pBackTL && pBackTR && pBackBR && pBackBL) {
-        ctx.beginPath();
-        ctx.moveTo(pBackTL.x, pBackTL.y);
-        ctx.lineTo(pBackTR.x, pBackTR.y);
-        ctx.lineTo(pBackBR.x, pBackBR.y);
-        ctx.lineTo(pBackBL.x, pBackBL.y);
-        ctx.closePath();
-        const wallGrad = ctx.createLinearGradient(0, pBackTL.y, 0, pBackBL.y);
-        wallGrad.addColorStop(0, `rgba(10, 12, 16, 0.96)`);
-        wallGrad.addColorStop(1, `rgba(4, 5, 8, 0.98)`);
-        ctx.fillStyle = wallGrad;
-        ctx.fill();
-      }
-
-      // — ESTRUCTURA 3D DE LA PUERTA DE SALIDA (PARED TRASERA) ─────
-      // Ubicación en 3D: x: 0.0, y: 0.1 (centro), z: -5.45
-      const doorW = 1.3, doorH = 2.1;
-      const dTL = project3D(-doorW/2, -doorH/2 + 0.15, -5.45);
-      const dTR = project3D( doorW/2, -doorH/2 + 0.15, -5.45);
-      const dBR = project3D( doorW/2,  1.18,           -5.45);
-      const dBL = project3D(-doorW/2,  1.18,           -5.45);
-
-      let isDoorCurrentlyHovered = false;
-
-      if (dTL && dTR && dBR && dBL) {
-        // Distancia a la puerta y comprobación estricta de Hover
-        const minDx = Math.min(dTL.x, dBL.x), maxDx = Math.max(dTR.x, dBR.x);
-        const minDy = Math.min(dTL.y, dTR.y), maxDy = Math.max(dBL.y, dBR.y);
-
-        const isMouseInDoorPoly = (currentMouseX >= minDx && currentMouseX <= maxDx &&
-                                   currentMouseY >= minDy && currentMouseY <= maxDy);
-
-        isDoorCurrentlyHovered = isMouseInDoorPoly && (camera.z > 1.8) && !screens.some(s => s.hovered);
-
-        // Marco exterior de la puerta
-        ctx.beginPath();
-        ctx.moveTo(dTL.x, dTL.y);
-        ctx.lineTo(dTR.x, dTR.y);
-        ctx.lineTo(dBR.x, dBR.y);
-        ctx.lineTo(dBL.x, dBL.y);
-        ctx.closePath();
-
-        const doorGrad = ctx.createLinearGradient(dTL.x, dTL.y, dBR.x, dBR.y);
-        doorGrad.addColorStop(0, isDoorCurrentlyHovered ? 'rgba(28, 45, 60, 0.95)' : 'rgba(14, 18, 26, 0.85)');
-        doorGrad.addColorStop(1, isDoorCurrentlyHovered ? 'rgba(16, 30, 44, 0.98)' : 'rgba(8, 10, 15, 0.9)');
-        ctx.fillStyle = doorGrad;
-        ctx.fill();
-
-        ctx.strokeStyle = isDoorCurrentlyHovered ? '#64ffda' : 'rgba(180, 220, 255, 0.35)';
-        ctx.lineWidth = isDoorCurrentlyHovered ? 2.0 : 1.2;
-        ctx.stroke();
-
-        // Paneles de vidrio y línea divisoria central
-        const dMidTop = project3D(0, -doorH/2 + 0.15, -5.45);
-        const dMidBot = project3D(0,  1.18,           -5.45);
-        if (dMidTop && dMidBot) {
-          ctx.beginPath();
-          ctx.moveTo(dMidTop.x, dMidTop.y);
-          ctx.lineTo(dMidBot.x, dMidBot.y);
-          ctx.strokeStyle = 'rgba(255, 255, 255, 0.25)';
-          ctx.lineWidth = 1;
-          ctx.stroke();
-        }
-
-        // Tiradores metálicos de la puerta
-        const handleL = project3D(-0.08, 0.2, -5.44);
-        const handleR = project3D( 0.08, 0.2, -5.44);
-        if (handleL && handleR) {
-          ctx.fillStyle = '#ffffff';
-          ctx.fillRect(handleL.x - 1, handleL.y - 8, 2, 16);
-          ctx.fillRect(handleR.x,     handleR.y - 8, 2, 16);
-        }
-
-        // Indicador LED sutil sobre el marco de la puerta (sin texto en canvas)
-        const dLed = project3D(0, -doorH/2 + 0.08, -5.44);
-        if (dLed) {
-          ctx.fillStyle = isDoorCurrentlyHovered ? '#64ffda' : 'rgba(100, 255, 218, 0.6)';
-          ctx.beginPath();
-          ctx.arc(dLed.x, dLed.y, Math.max(2, 3 * dLed.sc), 0, Math.PI * 2);
-          ctx.fill();
+      // Bolas
+      for (let i = lightSpheres.length - 1; i >= 0; i--) {
+        const s = lightSpheres[i];
+        s.update(dt, roomTension);
+        if (s.age > s.maxAge) {
+          s.destroy();
+          lightSpheres.splice(i, 1);
         }
       }
 
-      // — TECHO Y ILUMINACIÓN DE PENUMBRA —
-      const ceilingAlpha = 0.06 * lightVal;
-      ctx.strokeStyle = `rgba(180, 210, 255, ${ceilingAlpha})`;
-      ctx.lineWidth = 1;
-      for (let cx = -4; cx <= 4; cx += 2) {
-        const cA = project3D(cx, -2.3, -5.5), cB = project3D(cx, -2.3, 5.5);
-        if (cA && cB) { ctx.beginPath(); ctx.moveTo(cA.x, cA.y); ctx.lineTo(cB.x, cB.y); ctx.stroke(); }
-      }
-
-      // — HAZ DE LUZ ATENUADO EN PENUMBRA —
-      const spotApex = project3D(0, -3.2, 0);
-      const spotB1   = project3D(-1.5, 1.15, -1.5);
-      const spotB2   = project3D( 1.5, 1.15,  1.5);
-      if (spotApex && spotB1 && spotB2) {
-        const sg = ctx.createLinearGradient(spotApex.x, spotApex.y, (spotB1.x+spotB2.x)/2, (spotB1.y+spotB2.y)/2);
-        sg.addColorStop(0, `rgba(255,255,255,${0.35 * lightVal})`);
-        sg.addColorStop(0.6, `rgba(180,210,255,${0.12 * lightVal})`);
-        sg.addColorStop(1, 'rgba(255,255,255,0)');
-        ctx.fillStyle = sg;
-        ctx.beginPath();
-        ctx.moveTo(spotApex.x, spotApex.y);
-        ctx.lineTo(spotB1.x, spotB1.y);
-        ctx.lineTo(spotB2.x, spotB2.y);
-        ctx.closePath();
-        ctx.fill();
-      }
-
-      // — PISO DE VIDRIO OSCURO Y MÁRMOL —
-      const floorAlpha = 0.12 * lightVal;
-      ctx.strokeStyle = `rgba(140, 180, 255, ${floorAlpha})`;
-      ctx.lineWidth = 1;
-      for (let gx = -5; gx <= 5; gx += 1) {
-        const pA = project3D(gx, 1.2, -5.5), pB = project3D(gx, 1.2, 5.5);
-        if (pA && pB) { ctx.beginPath(); ctx.moveTo(pA.x, pA.y); ctx.lineTo(pB.x, pB.y); ctx.stroke(); }
-      }
-      for (let gz = -5; gz <= 5; gz += 1) {
-        const pA = project3D(-5, 1.2, gz), pB = project3D(5, 1.2, gz);
-        if (pA && pB) { ctx.beginPath(); ctx.moveTo(pA.x, pA.y); ctx.lineTo(pB.x, pB.y); ctx.stroke(); }
-      }
-
-      // Reflejo central en el piso
-      const floorCenter = project3D(0, 1.19, 0);
-      if (floorCenter) {
-        const fg = ctx.createRadialGradient(floorCenter.x, floorCenter.y, 0, floorCenter.x, floorCenter.y, 160 * floorCenter.sc);
-        fg.addColorStop(0, `rgba(180,210,255,${0.18 * lightVal + 0.04 * Math.sin(t * 1.8)})`);
-        fg.addColorStop(0.7, `rgba(140,180,255,${0.05 * lightVal})`);
-        fg.addColorStop(1, 'rgba(140,180,255,0)');
-        ctx.fillStyle = fg;
-        ctx.beginPath();
-        ctx.ellipse(floorCenter.x, floorCenter.y, 200 * floorCenter.sc, 65 * floorCenter.sc, 0, 0, Math.PI * 2);
-        ctx.fill();
-      }
-
-      // — RENDERING DE ONDAS VISUALES EN LA SALA (RIPPLES DEL MOUSE) ──
-      for (let i = roomRipples.length - 1; i >= 0; i--) {
-        const rip = roomRipples[i];
-        rip.r += rip.speed;
-        rip.alpha *= 0.945;
-
-        if (rip.r >= rip.maxR || rip.alpha <= 0.01) {
-          roomRipples.splice(i, 1);
-          continue;
-        }
-
-        ctx.strokeStyle = `${rip.color}${rip.alpha})`;
-        ctx.lineWidth = 1.6;
-        ctx.beginPath();
-        ctx.arc(rip.x, rip.y, rip.r, 0, Math.PI * 2);
-        ctx.stroke();
-
-        // Segunda onda secundaria
-        if (rip.r > 15) {
-          ctx.strokeStyle = `${rip.color}${rip.alpha * 0.5})`;
-          ctx.lineWidth = 0.9;
-          ctx.beginPath();
-          ctx.arc(rip.x, rip.y, rip.r * 0.65, 0, Math.PI * 2);
-          ctx.stroke();
-        }
-      }
-
-      // Partículas ambientales en penumbra
-      spaceParticles.forEach(p => {
-        p.x += p.vx; p.y += p.vy; p.z += p.vz;
-        if (p.x > 4.2) p.x = -4.2; if (p.x < -4.2) p.x = 4.2;
-        if (p.y > 1.2) p.y = -2.0; if (p.y < -2.0) p.y = 1.2;
-        if (p.z > 5.4) p.z = -5.4; if (p.z < -5.4) p.z = 5.4;
-
-        const glimmer = 0.35 + 0.65 * Math.sin(t * 2 + p.phase);
-        const pp = project3D(p.x, p.y, p.z);
-        if (!pp) return;
-        const pr = Math.max(1, p.size * pp.sc * 14);
-        ctx.fillStyle = `rgba(180, 215, 255, ${p.alpha * glimmer * lightVal})`;
-        ctx.beginPath();
-        ctx.arc(pp.x, pp.y, pr, 0, Math.PI * 2);
-        ctx.fill();
+      // Esferas de Techo
+      ceilingOrbs.forEach(orb => {
+        const sx = Math.sin(time * orb.freq + orb.phase) * 0.25;
+        const sz = Math.cos(time * orb.freq * 0.8 + orb.phase) * 0.2;
+        orb.mesh.position.set(orb.anchor.x + sx, orb.restY, orb.anchor.z + sz);
+        orb.wire.geometry.setFromPoints([orb.anchor, orb.mesh.position]);
       });
 
-      // — PANTALLAS DIGITALES INTERACTIVAS CON ONDAS VISUALES —
-      screens.forEach(sc => {
-        const hw = sc.width / 2, hh = sc.height / 2;
-        const corners = [
-          project3D(sc.wx, sc.wy - hh, sc.wz - (sc.wx < 0 ? 0 : hw)),
-          project3D(sc.wx, sc.wy - hh, sc.wz + (sc.wx < 0 ? hw : 0)),
-          project3D(sc.wx, sc.wy + hh, sc.wz + (sc.wx < 0 ? hw : 0)),
-          project3D(sc.wx, sc.wy + hh, sc.wz - (sc.wx < 0 ? 0 : hw))
-        ].filter(Boolean);
-
-        if (sc.id === 'screenC') {
-          // Pantalla trasera plana
-          const cornersC = [
-            project3D(sc.wx - hw, sc.wy - hh, sc.wz),
-            project3D(sc.wx + hw, sc.wy - hh, sc.wz),
-            project3D(sc.wx + hw, sc.wy + hh, sc.wz),
-            project3D(sc.wx - hw, sc.wy + hh, sc.wz)
-          ].filter(Boolean);
-          if (cornersC.length === 4) corners.splice(0, 4, ...cornersC);
-        }
-
-        if (corners.length < 4) return;
-
-        const minX = Math.min(...corners.map(c=>c.x)), maxX = Math.max(...corners.map(c=>c.x));
-        const minY = Math.min(...corners.map(c=>c.y)), maxY = Math.max(...corners.map(c=>c.y));
-        const sw = maxX - minX, sh = maxY - minY;
-
-        // Detección de Hover / Apuntado del Mouse sobre la pantalla
-        const isHover = (currentMouseX >= minX && currentMouseX <= maxX && currentMouseY >= minY && currentMouseY <= maxY);
-        sc.hovered = isHover;
-        sc.hoverProgress += (isHover ? 1 : 0 - sc.hoverProgress) * 0.15;
-
-        if (isHover) {
-          sc.mouseRelX = (currentMouseX - minX) / sw;
-          sc.mouseRelY = (currentMouseY - minY) / sh;
-
-          // Generar ondas visuales continuas por movimiento de mouse
-          if (ts - sc.lastTouch > 90) {
-            sc.waves.push({ cx: sc.mouseRelX, cy: sc.mouseRelY, r: 0, alpha: 0.95 });
-            sc.lastTouch = ts;
-          }
-        }
-
-        // Borde y Fondo de la Pantalla
-        ctx.beginPath();
-        ctx.moveTo(corners[0].x, corners[0].y);
-        corners.forEach(c => ctx.lineTo(c.x, c.y));
-        ctx.closePath();
-
-        const screenBg = ctx.createLinearGradient(corners[0].x, corners[0].y, corners[2].x, corners[2].y);
-        screenBg.addColorStop(0, `rgba(6, 10, 20, ${0.94 - sc.hoverProgress * 0.2})`);
-        screenBg.addColorStop(1, `rgba(12, 22, 40, ${0.9 - sc.hoverProgress * 0.1})`);
-        ctx.fillStyle = screenBg;
-        ctx.fill();
-
-        ctx.strokeStyle = `rgba(180, 225, 255, ${0.3 + sc.hoverProgress * 0.65})`;
-        ctx.lineWidth = 1.5 + sc.hoverProgress * 1.5;
-        ctx.stroke();
-
-        // Contenido Dinámico & Ondas dentro de la Pantalla
-        ctx.save();
-        ctx.beginPath();
-        ctx.moveTo(corners[0].x, corners[0].y);
-        corners.forEach(c => ctx.lineTo(c.x, c.y));
-        ctx.closePath();
-        ctx.clip();
-
-        // Partículas reactivas internas
-        sc.particles.forEach(p => {
-          p.x += p.vx * (1 + sc.hoverProgress * 2.5);
-          p.y += p.vy * (1 + sc.hoverProgress * 2.5);
-          if (p.x < 0 || p.x > 1) p.vx *= -1;
-          if (p.y < 0 || p.y > 1) p.vy *= -1;
-
-          const px2 = minX + p.x * sw, py2 = minY + p.y * sh;
-          ctx.fillStyle = `rgba(190, 230, 255, ${0.15 + sc.hoverProgress * 0.65})`;
-          ctx.beginPath();
-          ctx.arc(px2, py2, Math.max(1, p.r * corners[0].sc * 16), 0, Math.PI * 2);
-          ctx.fill();
-        });
-
-        // Ondas visuales internas expandiéndose (Ripples)
-        sc.waves = sc.waves.filter(w => w.alpha > 0.01);
-        sc.waves.forEach(w => {
-          w.r += 2.2 * (1 + sc.hoverProgress);
-          w.alpha *= 0.93;
-          const wox = minX + w.cx * sw, woy = minY + w.cy * sh;
-          ctx.strokeStyle = `rgba(180, 235, 255, ${w.alpha * (0.4 + sc.hoverProgress * 0.6)})`;
-          ctx.lineWidth = 1.4;
-          ctx.beginPath();
-          ctx.arc(wox, woy, w.r, 0, Math.PI * 2);
-          ctx.stroke();
-        });
-
-        // Espectro de Ondas Sinusoidales en la pantalla
-        ctx.beginPath();
-        ctx.strokeStyle = `rgba(100, 255, 218, ${0.4 + sc.hoverProgress * 0.5})`;
-        ctx.lineWidth = 1.2;
-        for (let sx = 0; sx <= sw; sx += 4) {
-          const normX = sx / sw;
-          const distToMouse = Math.abs(normX - sc.mouseRelX);
-          const amp = (sh * 0.18) * (1 + (1 - Math.min(1, distToMouse * 3)) * sc.hoverProgress * 2);
-          const sy2 = minY + sh * 0.5 + Math.sin(normX * 12 + t * 4) * amp;
-          if (sx === 0) ctx.moveTo(minX + sx, sy2);
-          else ctx.lineTo(minX + sx, sy2);
-        }
-        ctx.stroke();
-
-        // Texto de Estado en la Pantalla
-        ctx.font = `600 ${Math.max(9, Math.round(10 * corners[0].sc))}px monospace`;
-        ctx.fillStyle = sc.hovered ? '#64ffda' : 'rgba(180, 220, 255, 0.7)';
-        ctx.fillText(sc.title, minX + 12, minY + 20);
-        ctx.fillStyle = sc.hovered ? '#ffffff' : 'rgba(180, 220, 255, 0.4)';
-        ctx.fillText(sc.hovered ? 'ESTADO: [ ONDAS EN CASCADA ]' : sc.subtitle, minX + 12, minY + 36);
-
-        ctx.restore();
-      });
-
-      // — OBRA CENTRAL: ESCULTURA DE PENUMBRA Y LUZ —
-      const rot2 = t * 0.75;
-      for (let r = 0; r < 5; r++) {
-        const ry = -0.35 + (r - 2) * 0.28;
-        const rr = 0.48 + Math.sin(t * 1.3 + r) * 0.08;
-        ctx.beginPath();
-        let first2 = null;
-        for (let s = 0; s <= 16; s++) {
-          const ang = (s / 16) * Math.PI * 2 + rot2 * (r % 2 === 0 ? 1 : -1);
-          const p = project3D(rr * Math.cos(ang), ry, rr * Math.sin(ang));
-          if (p) {
-            if (!first2) { first2 = p; ctx.moveTo(p.x, p.y); }
-            else ctx.lineTo(p.x, p.y);
-          }
-        }
-        const pulse = 0.5 + 0.45 * Math.sin(t * 2.2 + r);
-        ctx.strokeStyle = r === 2 ? `rgba(255,255,255,${0.65 + pulse * 0.25})` : `rgba(200,225,255,${pulse * 0.45})`;
-        ctx.lineWidth = r === 2 ? 2.2 : 1.1;
-        ctx.stroke();
+      // Reflejos dinámicos del suelo en las esferas del techo
+      if (frame % 2 === 0) {
+        ceilingOrbs.forEach(o => o.mesh.visible = false);
+        cubeCamera.update(renderer, scene);
+        ceilingOrbs.forEach(o => o.mesh.visible = true);
       }
 
-      // Núcleo central brillante tenue
-      const pCore = project3D(0, -0.35, 0);
-      if (pCore) {
-        const coreRad = Math.max(3, 14 * pCore.sc);
-        const cg = ctx.createRadialGradient(pCore.x, pCore.y, 0, pCore.x, pCore.y, coreRad);
-        cg.addColorStop(0, '#ffffff');
-        cg.addColorStop(0.4, 'rgba(180,220,255,0.7)');
-        cg.addColorStop(1, 'rgba(180,220,255,0)');
-        ctx.fillStyle = cg;
-        ctx.beginPath();
-        ctx.arc(pCore.x, pCore.y, coreRad, 0, Math.PI * 2);
-        ctx.fill();
-      }
-
-      // Hotspot central proyectado
-      if (pCore && hotspot) {
-        hotspot.style.left = `${pCore.x}px`;
-        hotspot.style.top = `${pCore.y}px`;
-        hotspot.style.display = pCore.depth > 0.5 ? 'block' : 'none';
-      }
-
-      // Actualizar HUD Coordenadas
-      if (coordX) coordX.textContent = camera.x.toFixed(1);
-      if (coordZ) coordZ.textContent = camera.z.toFixed(1);
-      if (coordAngle) {
-        const deg = Math.round(((camera.yaw % (Math.PI * 2) + Math.PI * 2) % (Math.PI * 2)) * (180 / Math.PI));
-        coordAngle.textContent = `${deg}°`;
-      }
-
-      if (roomSound) galleryAudio.modulate(Math.hypot(camera.x, camera.z) / 5);
-
-      drawMinimap();
-
-      requestAnimationFrame(renderRoom);
-    }
-    requestAnimationFrame(renderRoom);
-
-    // ── INTERACCIÓN CON EL MOUSE EN 3D Y GENERADOR DE ONDAS ────
-
-    function enterPointerLock() {
-      roomCanvas.requestPointerLock = roomCanvas.requestPointerLock || roomCanvas.mozRequestPointerLock;
-      if (roomCanvas.requestPointerLock) {
-        roomCanvas.requestPointerLock();
-      }
+      renderer.render(scene, camera);
     }
 
-    if (btnFpsMode) {
-      btnFpsMode.addEventListener('click', () => {
-        if (!isPointerLocked) enterPointerLock();
-        else document.exitPointerLock();
-      });
-    }
-
-    document.addEventListener('pointerlockchange', handlePointerLockChange);
-    document.addEventListener('mozpointerlockchange', handlePointerLockChange);
-
-    function handlePointerLockChange() {
-      isPointerLocked = (document.pointerLockElement === roomCanvas || document.mozPointerLockElement === roomCanvas);
-      if (btnFpsMode) {
-        btnFpsMode.classList.toggle('active', isPointerLocked);
-        btnFpsMode.innerHTML = isPointerLocked ?
-          '<span class="game-icon">🟢</span> MODO FPS ACTIVO (PULSA ESC PARA SALIR)' :
-          '<span class="game-icon">🎮</span> MODO VIDEOJUEGO 3D (CLIC PARA ACTIVAR)';
-      }
-      if (fpsCrosshair) fpsCrosshair.classList.toggle('active', isPointerLocked);
-      roomCanvas.style.cursor = isPointerLocked ? 'none' : 'crosshair';
-    }
-
-    // Movimiento del Mouse: Generar Ondas Visuales y Rotación de Cámara
-    window.addEventListener('mousemove', e => {
-      const rect = roomCanvas.getBoundingClientRect();
-      currentMouseX = e.clientX - rect.left;
-      currentMouseY = e.clientY - rect.top;
-
-      // Emitir ondas visuales al mover el ratón sobre el canvas
-      if (currentMouseX >= 0 && currentMouseX <= rect.width && currentMouseY >= 0 && currentMouseY <= rect.height) {
-        const now = performance.now();
-        if (now - lastRippleTime > 80) {
-          addRoomRipple(currentMouseX, currentMouseY, 110, 'rgba(180,220,255,');
-          lastRippleTime = now;
-        }
-      }
-
-      if (isPointerLocked) {
-        const sensitivity = 0.0032;
-        camera.targetYaw   += e.movementX * sensitivity;
-        camera.targetPitch  = Math.max(-0.45, Math.min(0.42, camera.targetPitch + e.movementY * (sensitivity * 0.8)));
-      } else if (lookMode) {
-        const dx = e.clientX - lastMX;
-        const dy = e.clientY - lastMY;
-        camera.targetYaw   += dx * 0.0055;
-        camera.targetPitch  = Math.max(-0.45, Math.min(0.42, camera.targetPitch + dy * 0.004));
-        lastMX = e.clientX;
-        lastMY = e.clientY;
-      }
-    });
-
-    roomCanvas.addEventListener('mousedown', e => {
-      if (!isPointerLocked && e.button === 0) {
-        lookMode = true;
-        lastMX = e.clientX;
-        lastMY = e.clientY;
-        roomCanvas.style.cursor = 'grabbing';
-      }
-
-      if (isPointerLocked) {
-        if (e.button === 0) mouseDownWalk = true;
-        if (e.button === 2) mouseBackWalk = true;
-      }
-
-      // Emitir ráfaga de ondas al hacer clic
-      const rect = roomCanvas.getBoundingClientRect();
-      const mx = e.clientX - rect.left, my = e.clientY - rect.top;
-      addRoomRipple(mx, my, 180, 'rgba(100,255,218,');
-    });
-
-    window.addEventListener('mouseup', e => {
-      lookMode = false;
-      if (!isPointerLocked) roomCanvas.style.cursor = 'crosshair';
-      mouseDownWalk = false;
-      mouseBackWalk = false;
-    });
-
-    roomCanvas.addEventListener('wheel', e => {
-      e.preventDefault();
-      const step = e.deltaY > 0 ? -0.32 : 0.32;
-      const cy2 = Math.cos(camera.yaw), sy = Math.sin(camera.yaw);
-      camera.vx += sy * step;
-      camera.vz -= cy2 * step;
-    }, { passive: false });
-
-    roomCanvas.addEventListener('contextmenu', e => e.preventDefault());
-
-    // Clics interactivos en la Sala 3D
-    roomCanvas.addEventListener('click', e => {
-      const rect = roomCanvas.getBoundingClientRect();
-      const mx = e.clientX - rect.left, my = e.clientY - rect.top;
-
-      // Comprobar clic en pantallas interactivas
-      let screenClicked = false;
-      screens.forEach(sc => {
-        if (sc.hovered) {
-          screenClicked = true;
-          sc.waves.push({ cx: sc.mouseRelX, cy: sc.mouseRelY, r: 0, alpha: 0.98 });
-          sc.particles.forEach(p => { p.target_a = 0.95; });
-          sc.lastTouch = performance.now();
-          if (galleryAudio) galleryAudio.playGlintChime(320 + Math.random() * 380);
-          showToast(`Actividad en Pantalla: ${sc.title}`);
-        }
-      });
-
-      // Comprobar clic en Puerta de Salida 3D únicamente si no se hizo clic en una pantalla
-      if (!screenClicked) {
-        const doorW = 1.3, doorH = 2.1;
-        const dTL = project3D(-doorW/2, -doorH/2 + 0.15, -5.45);
-        const dTR = project3D( doorW/2, -doorH/2 + 0.15, -5.45);
-        const dBR = project3D( doorW/2,  1.18,           -5.45);
-        const dBL = project3D(-doorW/2,  1.18,           -5.45);
-        if (dTL && dTR && dBR && dBL) {
-          const minDx = Math.min(dTL.x, dBL.x), maxDx = Math.max(dTR.x, dBR.x);
-          const minDy = Math.min(dTL.y, dTR.y), maxDy = Math.max(dBL.y, dBR.y);
-          if (mx >= minDx && mx <= maxDx && my >= minDy && my <= maxDy && camera.z > 1.8) {
-            exitGalleryRoom();
-          }
-        }
-      }
-    });
-
-    // D-Pad virtual
-    function dpad(id, fn) {
-      const b = document.getElementById(id);
-      if (b) b.addEventListener('click', fn);
-    }
-    dpad('dpadUp',    () => { const cy2 = Math.cos(camera.yaw), sy = Math.sin(camera.yaw); camera.vx += sy * 0.45; camera.vz -= cy2 * 0.45; });
-    dpad('dpadDown',  () => { const cy2 = Math.cos(camera.yaw), sy = Math.sin(camera.yaw); camera.vx -= sy * 0.45; camera.vz += cy2 * 0.45; });
-    dpad('dpadLeft',  () => { const cy2 = Math.cos(camera.yaw), sy = Math.sin(camera.yaw); camera.vx -= cy2 * 0.45; camera.vz -= sy * 0.45; });
-    dpad('dpadRight', () => { const cy2 = Math.cos(camera.yaw), sy = Math.sin(camera.yaw); camera.vx += cy2 * 0.45; camera.vz += sy * 0.45; });
-
-    // Slider e Interruptores de Iluminación / Audio
-    if (lightRange) lightRange.addEventListener('input', e => lightVal = parseFloat(e.target.value));
-    if (lightSelect) lightSelect.addEventListener('change', e => lightMode = e.target.value);
-    if (roomAudioBtn) roomAudioBtn.addEventListener('click', () => {
-      const on = galleryAudio.toggle();
-      roomSound = on; updateSoundUI(on);
-      if (on) { roomAudioBtn.classList.add('active'); if(synthStatus) synthStatus.textContent='SINTETIZADOR EMITIENDO'; if(synthPulse) synthPulse.style.backgroundColor='#fff'; }
-      else    { roomAudioBtn.classList.remove('active'); if(synthStatus) synthStatus.textContent='SINTETIZADOR EN ESPERA'; }
-    });
-  }
+    renderLoop();
+  })();
 
   /* ══════════════════════════════════════════════════════════════
      10. FORMULARIO DE CONTACTO
