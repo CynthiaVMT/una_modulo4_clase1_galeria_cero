@@ -1912,6 +1912,42 @@ body {
   color: var(--color-gray-300);
 }
 
+/* Acciones HUD L&S (Puerta de Salida y Pantalla Completa) */
+.ls-hud-actions {
+  display: flex;
+  align-items: center;
+  gap: 0.8rem;
+}
+
+.ls-exit-door-btn, .ls-fullscreen-btn {
+  background: rgba(255, 255, 255, 0.08);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  color: #ffffff;
+  padding: 0.4rem 0.9rem;
+  border-radius: 20px;
+  font-size: 0.72rem;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  cursor: pointer;
+  transition: all 0.25s ease;
+}
+
+.ls-exit-door-btn:hover {
+  background: rgba(100, 255, 218, 0.2);
+  border-color: #64ffda;
+  color: #64ffda;
+  box-shadow: 0 0 12px rgba(100, 255, 218, 0.35);
+}
+
+.ls-fullscreen-btn:hover {
+  background: rgba(255, 255, 255, 0.2);
+  border-color: #ffffff;
+  box-shadow: 0 0 12px rgba(255, 255, 255, 0.35);
+}
+
 /* D-Pad en Pantalla para Control de Caminata */
 .onscreen-nav-pad {
   position: absolute;
@@ -2727,4 +2763,156 @@ body {
     flex-direction: column;
     align-items: flex-start;
   }
+}
+
+
+/* ══════════════════════════════════════════════════════════════
+   SALA C: SECCIÓN L&S - SALA ELÁSTICA (V2)
+   ══════════════════════════════════════════════════════════════ */
+.ls-tension-monitor {
+  display: flex;
+  align-items: center;
+  gap: 0.8rem;
+  background: rgba(255, 255, 255, 0.04);
+  padding: 0.4rem 0.9rem;
+  border-radius: 20px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.tension-label {
+  font-size: 0.65rem;
+  font-family: var(--font-mono, monospace);
+  letter-spacing: 0.15em;
+  color: var(--color-gray-400, #888);
+}
+
+.ls-tension-bar-track {
+  width: 90px;
+  height: 6px;
+  background: rgba(255, 255, 255, 0.1);
+  border-radius: 10px;
+  overflow: hidden;
+  position: relative;
+}
+
+.ls-tension-bar-fill {
+  height: 100%;
+  width: 0%;
+  background: linear-gradient(90deg, #00f0ff 0%, #ff0077 70%, #ffea00 100%);
+  border-radius: 10px;
+  transition: width 0.08s ease-out;
+  box-shadow: 0 0 10px #00f0ff;
+}
+
+.ls-tension-val {
+  font-size: 0.8rem;
+  font-family: var(--font-mono, monospace);
+  color: #00f0ff;
+  min-width: 32px;
+}
+
+.ls-cam-selector-floating {
+  position: absolute;
+  top: 16px;
+  right: 16px;
+  display: flex;
+  gap: 6px;
+  z-index: 10;
+  background: rgba(8, 12, 22, 0.65);
+  backdrop-filter: blur(12px);
+  padding: 6px;
+  border-radius: 8px;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+}
+
+.ls-cam-pill {
+  background: transparent;
+  border: 1px solid transparent;
+  color: var(--color-gray-400, #888);
+  font-size: 0.68rem;
+  font-weight: 600;
+  letter-spacing: 0.1em;
+  padding: 6px 10px;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.ls-cam-pill:hover {
+  color: #fff;
+  background: rgba(255, 255, 255, 0.08);
+}
+
+.ls-cam-pill.active {
+  background: rgba(0, 240, 255, 0.15);
+  border-color: rgba(0, 240, 255, 0.5);
+  color: #00f0ff;
+  box-shadow: 0 0 10px rgba(0, 240, 255, 0.2);
+}
+
+.ls-color-picker-item {
+  display: flex;
+  align-items: center;
+  gap: 0.8rem;
+}
+
+.ls-color-strip {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.ls-color-dot {
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  border: 2px solid transparent;
+  background: var(--c);
+  cursor: pointer;
+  transition: transform 0.2s, box-shadow 0.2s, border-color 0.2s;
+  box-shadow: 0 0 8px var(--c);
+  padding: 0;
+}
+
+.ls-color-dot:hover {
+  transform: scale(1.2);
+}
+
+.ls-color-dot.active {
+  border-color: #ffffff;
+  transform: scale(1.25);
+  box-shadow: 0 0 14px var(--c);
+}
+
+.btn-tool-action {
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  padding: 0.6rem 1rem;
+  border-radius: 4px;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  cursor: pointer;
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  background: rgba(255, 255, 255, 0.05);
+  color: #fff;
+  transition: all 0.2s ease;
+}
+
+.btn-tool-action:hover {
+  background: rgba(255, 255, 255, 0.15);
+  border-color: #00f0ff;
+  transform: translateY(-1px);
+}
+
+.btn-tool-action.primary {
+  background: linear-gradient(135deg, rgba(0, 240, 255, 0.3) 0%, rgba(255, 0, 119, 0.3) 100%);
+  border-color: rgba(0, 240, 255, 0.5);
+  box-shadow: 0 0 14px rgba(0, 240, 255, 0.2);
+}
+
+.btn-tool-action.primary:hover {
+  background: linear-gradient(135deg, rgba(0, 240, 255, 0.5) 0%, rgba(255, 0, 119, 0.5) 100%);
+  box-shadow: 0 0 22px rgba(0, 240, 255, 0.4);
 }
